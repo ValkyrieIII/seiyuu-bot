@@ -27,11 +27,29 @@ class _ImageChangeHandler(FileSystemEventHandler):
         super().__init__()
         self.debounce_seconds = debounce_seconds
 
-    def on_any_event(self, event):
-        src_path = getattr(event, "src_path", "") or ""
-        if os.path.basename(src_path).startswith(".__tmp_"):
-            return
-        _schedule_scan(self.debounce_seconds)
+    def _is_ignored_path(self, path: str) -> bool:
+        return os.path.basename(path).startswith(".__tmp_")
+
+    def _trigger_if_valid(self, *paths: str):
+        for path in paths:
+            if path and not self._is_ignored_path(path):
+                _schedule_scan(self.debounce_seconds)
+                return
+
+    def on_created(self, event):
+        self._trigger_if_valid(getattr(event, "src_path", "") or "")
+
+    def on_modified(self, event):
+        self._trigger_if_valid(getattr(event, "src_path", "") or "")
+
+    def on_deleted(self, event):
+        self._trigger_if_valid(getattr(event, "src_path", "") or "")
+
+    def on_moved(self, event):
+        self._trigger_if_valid(
+            getattr(event, "src_path", "") or "",
+            getattr(event, "dest_path", "") or "",
+        )
 
 
 def _run_scan_once():
