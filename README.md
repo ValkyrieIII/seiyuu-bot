@@ -61,6 +61,7 @@
 - DB_ROOT_PASSWORD / DB_NAME / DB_USER / DB_PASSWORD：数据库配置
 - BOT_QQ：机器人 QQ 号
 - GROUP_ID：可选，限制群使用
+- UID / GID：可选，建议设置为宿主机运行用户的 uid/gid（用于避免容器写入后文件变成 root 属主）
 
 建议在生产环境至少修改：
 
@@ -68,13 +69,18 @@
 - DB_ROOT_PASSWORD
 - DB_PASSWORD
 
-### 3) 启动服务
+
+### 3) 挂载图片文件夹
+在根目录/images下创建声优文件夹，格式为images/声优名。
+在相应声优文件夹下放置图片。
+
+### 4) 启动服务
 
 ```bash
 docker compose up -d --build
 ```
 
-### 4) 检查状态
+### 5) 检查状态
 
 ```bash
 docker compose ps
@@ -155,6 +161,19 @@ python3 scripts/manage_aliases.py remove 贵贵
 - 别名是否正确映射到声优
 - 图片是否已执行同步（sync-database）
 - nonebot 日志是否有 file_missing/no_image 错误
+
+### 4) images 目录重启后变成 root 属主
+
+本项目默认策略：
+
+- nonebot 使用宿主机 UID/GID 运行，写入 images 时保持宿主机属主
+- napcat 对 images 使用只读挂载，避免第三方容器改写属主
+
+如果你的服务器用户不是 uid/gid 1000，请修改 .env 中 UID/GID 后重启：
+
+```bash
+docker compose up -d --force-recreate
+```
 
 ### 2) NapCat 连不上 NoneBot
 

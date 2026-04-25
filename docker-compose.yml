@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # MySQL 数据库服务
   mysql:
@@ -33,6 +31,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: qqbot-nonebot
+    user: "${UID:-1000}:${GID:-1000}"
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
@@ -82,7 +81,7 @@ services:
       - "6099:6099"
     volumes:
       - napcat_data:/opt/napcat/data
-      - ./images:/app/images
+      - ./images:/app/images:ro
       - napcat_plugins:/app/napcat/plugins
     networks:
       - qqbot_network

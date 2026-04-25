@@ -8,6 +8,7 @@ import threading
 import uuid
 from pathlib import Path
 from typing import Optional
+from sqlalchemy import text
 from loguru import logger
 from bot.config import settings
 
@@ -283,6 +284,16 @@ def initialize_image_records(base_path: Optional[str] = None):
         try:
             session.query(Image).delete(synchronize_session=False)
             session.query(VoiceActor).delete(synchronize_session=False)
+
+            # 重置自增序列，确保重新初始化后 ID 从 1 开始。
+            # 当前部署使用 MySQL；若非 MySQL 则忽略并继续插入。
+            try:
+                if session.bind and session.bind.dialect.name == "mysql":
+                    session.execute(text("ALTER TABLE images AUTO_INCREMENT = 1"))
+                    session.execute(text("ALTER TABLE voice_actors AUTO_INCREMENT = 1"))
+            except Exception as e:
+                logger.warning(f"重置自增序列失败，继续执行初始化: {e}")
+
             session.flush()
 
             added_actors = 0
