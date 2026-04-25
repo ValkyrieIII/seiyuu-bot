@@ -1,0 +1,65 @@
+{
+	"name": "QQ Bot - NoneBot2",
+	"dockerComposeFile": "../docker-compose.yml",
+	"service": "nonebot",
+	"workspaceFolder": "/app",
+	"remoteUser": "root",
+	"features": {
+		"ghcr.io/devcontainers/features/python:1": {
+			"version": "3.12"
+		}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"charliermarsh.ruff",
+				"ms-python.debugpy",
+				"GitHub.copilot"
+			],
+			"settings": {
+				"python.defaultInterpreterPath": "/usr/local/bin/python",
+				"python.linting.enabled": true,
+				"python.formatting.provider": "none",
+				"[python]": {
+					"editor.defaultFormatter": "charliermarsh.ruff",
+					"editor.formatOnSave": true
+				},
+				"python.analysis.typeCheckingMode": "basic",
+				"python.analysis.extraPaths": [
+					"/app"
+				],
+				"files.exclude": {
+					"**/__pycache__": true,
+					"**/*.pyc": true,
+					"**/.pytest_cache": true
+				}
+			}
+		}
+	},
+	"forwardPorts": [
+		3306,
+		3307,
+		8080
+	],
+	"portAttributes": {
+		"3306": {
+			"label": "MySQL",
+			"onAutoForward": "silent"
+		},
+		"3307": {
+			"label": "MySQL (Exposed)",
+			"onAutoForward": "silent"
+		},
+		"8080": {
+			"label": "Bot API",
+			"onAutoForward": "notify"
+		}
+	},
+	"postCreateCommand": "pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple && python -m bot.manage reinit-db 2>/dev/null || true",
+	"remoteEnv": {
+		"PYTHONUNBUFFERED": "1",
+		"TZ": "Asia/Shanghai"
+	}
+}

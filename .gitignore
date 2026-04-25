@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 日志和数据
+logs/
+*.log
+*.sqlite
+*.db
+
+# 环境变量（本地开发用）
+.env*
+!.env.example
+
+# AccessToken 文件（敏感信息）
+accesstoken
+accesstoken.txt
+*.accesstoken
+
+# Docker
+docker-compose.override.yml
+
+# 图片资源（大文件）
+images/*
+!images/.gitkeep
+
+# 数据库备份
+database/backups/
+
+# 临时文件
+*.tmp
+*.temp

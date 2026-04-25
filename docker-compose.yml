@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  # MySQL 数据库服务
+  mysql:
+    image: mysql:8.0
+    container_name: qqbot-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root123}
+      MYSQL_DATABASE: ${DB_NAME:-qqbot}
+      MYSQL_USER: ${DB_USER:-qqbot}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-qqbot123}
+      TZ: Asia/Shanghai
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/seed.sql
+    networks:
+      - qqbot_network
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 20s
+      retries: 10
+      interval: 10s
+    restart: unless-stopped
+
+  # NoneBot 应用服务
+  nonebot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: qqbot-nonebot
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-qqbot}
+      DB_USER: ${DB_USER:-qqbot}
+      DB_PASSWORD: ${DB_PASSWORD:-qqbot123}
+      DRIVER: ${DRIVER:-~fastapi}
+      HOST: ${HOST:-0.0.0.0}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      NONEBOT_ADAPTER_ONEBOT_WS_REVERSE_SERVERS: '[\"${SERVER_IP}:8080\"]'
+      NONEBOT_ADAPTER_ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:-s~N9cCeg-SDmpwWM}
+      NAPCAT_HOST: ${NAPCAT_HOST:-napcat}
+      NAPCAT_PORT: ${NAPCAT_PORT:-3001}
+      NAPCAT_WS_PATH: /onebot/v11/ws
+      BOT_QQ: ${BOT_QQ:-123456789}
+      GROUP_ID: ${GROUP_ID:-}
+      TZ: Asia/Shanghai
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+      PYTHONIOENCODING: utf-8
+    ports:
+      - "${NONEBOT_PORT:-8080}:8080"
+    volumes:
+      - ./backend/bot:/app/bot
+      - ./images:/app/images
+      - ./config:/app/config
+      - ./logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - qqbot_network
+    restart: unless-stopped
+    command: python -m bot.main
+
+  # NapCat 协议服务
+  napcat:
+    image: mlikiowa/napcat-docker:latest
+    container_name: qqbot-napcat
+    environment:
+      NAPCAT_ADMIN_ENDPOINT: "http://0.0.0.0:3000"
+      NAPCAT_WS_ENDPOINT: "ws://0.0.0.0:3001"
+      # OneBot v11 反向 WebSocket 配置
+      # NapCat 会主动连接到 NoneBot 推送消息
+      NAPCAT_ONEBOT_V11_REVERSE_WS: "ws://${SERVER_IP}:8080/onebot/v11/ws"
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+      - "6099:6099"
+    volumes:
+      - napcat_data:/opt/napcat/data
+      - ./images:/app/images
+      - napcat_plugins:/app/napcat/plugins
+    networks:
+      - qqbot_network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+    driver: local
+  napcat_data:
+    driver: local
+  napcat_plugins:
+    driver: local
+
+networks:
+  qqbot_network:
+    driver: bridge

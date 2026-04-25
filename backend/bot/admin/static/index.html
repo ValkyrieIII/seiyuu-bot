@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QQBot 管理后台 MVP</title>
+    <style>
+        :root {
+            --bg: #f4efe5;
+            --panel: #fffaf2;
+            --ink: #1f2a2e;
+            --brand: #2d6a4f;
+            --brand-2: #bc6c25;
+            --danger: #b00020;
+            --line: #dccfb8;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+            color: var(--ink);
+            background: radial-gradient(circle at top right, #f0d9b6, transparent 38%), var(--bg);
+        }
+
+        header {
+            padding: 20px;
+            background: linear-gradient(90deg, var(--brand), #4f772d);
+            color: #fff;
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 14px;
+            padding: 14px;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 14px;
+            box-shadow: 0 5px 14px rgba(0, 0, 0, .06);
+        }
+
+        h2 {
+            margin: 4px 0 10px;
+            font-size: 18px;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .metric {
+            border: 1px dashed var(--line);
+            border-radius: 10px;
+            padding: 8px;
+            background: #fff;
+        }
+
+        .metric .label {
+            font-size: 12px;
+            opacity: .75;
+        }
+
+        .metric .value {
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th,
+        td {
+            padding: 6px;
+            border-bottom: 1px solid #ebdfcb;
+            text-align: left;
+        }
+
+        input,
+        select,
+        button,
+        textarea {
+            width: 100%;
+            padding: 8px;
+            margin: 4px 0;
+            border: 1px solid #cebfa8;
+            border-radius: 8px;
+            background: #fff;
+        }
+
+        button {
+            cursor: pointer;
+            background: var(--brand);
+            color: #fff;
+            border: none;
+        }
+
+        button.secondary {
+            background: var(--brand-2);
+        }
+
+        button.danger {
+            background: var(--danger);
+        }
+
+        .inline {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+
+        .status {
+            font-size: 13px;
+            min-height: 20px;
+        }
+
+        .logs {
+            max-height: 260px;
+            overflow: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>QQBot 管理后台 MVP</h1>
+        <div>路径: /admin · 同进程管理面板</div>
+    </header>
+
+    <main>
+        <section class="card">
+            <h2>概览</h2>
+            <div class="metrics" id="metrics"></div>
+            <h3>最近 20 条请求</h3>
+            <div class="logs">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>用户</th>
+                            <th>状态</th>
+                            <th>耗时</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logRows"></tbody>
+                </table>
+            </div>
+            <button class="secondary" id="refreshOverview">刷新概览</button>
+        </section>
+
+        <section class="card">
+            <h2>声优管理</h2>
+            <div class="inline">
+                <input id="actorName" placeholder="声优名称" />
+                <input id="actorDesc" placeholder="描述(可选)" />
+            </div>
+            <button id="addActor">新增声优</button>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>名称</th>
+                        <th>图片数</th>
+                        <th>启用</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="actorRows"></tbody>
+            </table>
+        </section>
+
+        <section class="card">
+            <h2>别名管理</h2>
+            <div class="inline">
+                <input id="aliasName" placeholder="别名" />
+                <select id="aliasTarget"></select>
+            </div>
+            <div class="inline">
+                <input id="aliasPriority" type="number" placeholder="优先级" value="0" />
+                <button id="addAlias">新增别名</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>别名</th>
+                        <th>目标声优</th>
+                        <th>优先级</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="aliasRows"></tbody>
+            </table>
+        </section>
+
+        <section class="card">
+            <h2>图片同步</h2>
+            <p>触发 scan_image_records，对文件系统与数据库做增量同步。</p>
+            <button id="syncBtn">执行同步</button>
+            <pre id="syncResult"></pre>
+            <div class="status" id="statusText"></div>
+        </section>
+    </main>
+
+    <script>
+        async function api(path, options = {}) {
+            const res = await fetch(path, {
+                headers: { "Content-Type": "application/json" },
+                ...options
+            });
+            const body = await res.json();
+            if (!res.ok || body.success === false) throw new Error(body.detail || body.error || "请求失败");
+            return body.data;
+        }
+
+        function setStatus(msg, isError = false) {
+            const el = document.getElementById("statusText");
+            el.textContent = msg;
+            el.style.color = isError ? "#b00020" : "#2d6a4f";
+        }
+
+        async function loadOverview() {
+            const data = await api("/admin/api/overview");
+            const metrics = document.getElementById("metrics");
+            metrics.innerHTML = "";
+            const items = [
+                ["声优总数", data.voice_actor_total],
+                ["图片总数", data.image_total],
+                ["别名总数", data.alias_total],
+                ["24h 请求", data.request_24h],
+                ["24h 成功率", data.success_rate_24h + "%"]
+            ];
+            items.forEach(([label, value]) => {
+                const div = document.createElement("div");
+                div.className = "metric";
+                div.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+                metrics.appendChild(div);
+            });
+
+            const logRows = document.getElementById("logRows");
+            logRows.innerHTML = "";
+            data.recent_logs.forEach(log => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `<td>${(log.created_at || "").replace("T", " ").slice(0, 19)}</td><td>${log.user_id || "-"}</td><td>${log.status || "-"}</td><td>${log.response_time_ms || "-"} ms</td>`;
+                logRows.appendChild(tr);
+            });
+        }
+
+        async function loadActors() {
+            const actors = await api("/admin/api/voice-actors");
+            const rows = document.getElementById("actorRows");
+            const aliasTarget = document.getElementById("aliasTarget");
+            rows.innerHTML = "";
+            aliasTarget.innerHTML = "";
+
+            actors.forEach(actor => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+          <td>${actor.id}</td>
+          <td>${actor.name}</td>
+          <td>${actor.image_count}</td>
+          <td>${actor.is_active ? "是" : "否"}</td>
+          <td><button data-id="${actor.id}" data-active="${actor.is_active}" class="toggleActor">切换启用</button></td>
+        `;
+                rows.appendChild(tr);
+
+                const option = document.createElement("option");
+                option.value = actor.id;
+                option.textContent = `${actor.name} (#${actor.id})`;
+                aliasTarget.appendChild(option);
+            });
+
+            document.querySelectorAll(".toggleActor").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    const id = Number(btn.dataset.id);
+                    const active = btn.dataset.active === "true";
+                    await api(`/admin/api/voice-actors/${id}`, {
+                        method: "PATCH",
+                        body: JSON.stringify({ is_active: !active })
+                    });
+                    setStatus("声优状态已更新");
+                    await Promise.all([loadActors(), loadOverview()]);
+                });
+            });
+        }
+
+        async function loadAliases() {
+            const aliases = await api("/admin/api/aliases");
+            const rows = document.getElementById("aliasRows");
+            rows.innerHTML = "";
+            aliases.forEach(item => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+          <td>${item.id}</td>
+          <td>${item.alias_name}</td>
+          <td>${item.target_voice_actor_name}</td>
+          <td>${item.priority}</td>
+          <td><button class="danger" data-id="${item.id}">删除</button></td>
+        `;
+                rows.appendChild(tr);
+            });
+
+            rows.querySelectorAll("button.danger").forEach(btn => {
+                btn.addEventListener("click", async () => {
+                    const id = Number(btn.dataset.id);
+                    await api(`/admin/api/aliases/${id}`, { method: "DELETE" });
+                    setStatus("别名已删除");
+                    await Promise.all([loadAliases(), loadOverview()]);
+                });
+            });
+        }
+
+        document.getElementById("refreshOverview").addEventListener("click", async () => {
+            try {
+                await loadOverview();
+                setStatus("概览刷新完成");
+            } catch (e) {
+                setStatus(e.message, true);
+            }
+        });
+
+        document.getElementById("addActor").addEventListener("click", async () => {
+            const name = document.getElementById("actorName").value.trim();
+            const description = document.getElementById("actorDesc").value.trim();
+            if (!name) {
+                setStatus("请输入声优名称", true);
+                return;
+            }
+            try {
+                await api("/admin/api/voice-actors", {
+                    method: "POST",
+                    body: JSON.stringify({ name, description })
+                });
+                document.getElementById("actorName").value = "";
+                document.getElementById("actorDesc").value = "";
+                setStatus("新增声优成功");
+                await Promise.all([loadActors(), loadOverview()]);
+            } catch (e) {
+                setStatus(e.message, true);
+            }
+        });
+
+        document.getElementById("addAlias").addEventListener("click", async () => {
+            const alias_name = document.getElementById("aliasName").value.trim();
+            const target_voice_actor_id = Number(document.getElementById("aliasTarget").value);
+            const priority = Number(document.getElementById("aliasPriority").value || 0);
+            if (!alias_name || !target_voice_actor_id) {
+                setStatus("请填写别名并选择目标声优", true);
+                return;
+            }
+            try {
+                await api("/admin/api/aliases", {
+                    method: "POST",
+                    body: JSON.stringify({ alias_name, target_voice_actor_id, priority })
+                });
+                document.getElementById("aliasName").value = "";
+                setStatus("新增别名成功");
+                await Promise.all([loadAliases(), loadOverview()]);
+            } catch (e) {
+                setStatus(e.message, true);
+            }
+        });
+
+        document.getElementById("syncBtn").addEventListener("click", async () => {
+            try {
+                setStatus("同步中...");
+                const data = await api("/admin/api/sync-images", { method: "POST" });
+                document.getElementById("syncResult").textContent = JSON.stringify(data, null, 2);
+                setStatus("图片同步完成");
+                await Promise.all([loadOverview(), loadActors(), loadAliases()]);
+            } catch (e) {
+                setStatus(e.message, true);
+            }
+        });
+
+        (async function init() {
+            try {
+                await Promise.all([loadOverview(), loadActors(), loadAliases()]);
+                setStatus("后台已就绪");
+            } catch (e) {
+                setStatus(e.message, true);
+            }
+        })();
+    </script>
+</body>
+
+</html>

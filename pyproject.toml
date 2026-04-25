@@ -1,0 +1,26 @@
+[project]
+name = "qqbot"
+version = "0.1.0"
+description = "QQ 声优机器人"
+authors = [{name = "Author", email = "author@example.com"}]
+requires-python = ">=3.9"
+dependencies = [
+    "nonebot2>=2.0.0",
+    "nonebot-adapter-onebot>=2.4.0",
+    "sqlalchemy>=2.0.0",
+    "pymysql>=1.1.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "loguru>=0.7.0",
+    "python-dotenv>=0.21.0",
+    "watchdog>=4.0.0",
+]
+
+[tool.nonebot]
+plugins = ["bot.plugins"]
+
+# OneBot v11 反向 WebSocket 服务器配置
+[tool.nonebot.ext.onebot_v11.ws_reverse_servers]
+host = "0.0.0.0"
+port = 8080
+access_token = "s~N9cCeg-SDmpwWM"
