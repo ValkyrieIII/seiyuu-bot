@@ -79,8 +79,6 @@ services:
       # NapCat 会主动连接到 NoneBot 推送消息
       NAPCAT_ONEBOT_V11_REVERSE_WS: "ws://${SERVER_IP}:8080/onebot/v11/ws"
     ports:
-      - "3000:3000"
-      - "3001:3001"
       - "6099:6099"
     volumes:
       - napcat_data:/opt/napcat/data
