@@ -86,7 +86,7 @@ docker compose logs -f nonebot
 - http://localhost:8080/admin
 
 如部署在远程服务器，请将 localhost 替换为服务器地址。
-如果服务器没有放通，8080端口，可使用本地ssh连接。
+如果服务器没有放通8080端口，可使用本地ssh连接。
 
 ## 使用说明
 
