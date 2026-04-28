@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 """管理后台路由：挂载到 NoneBot 的 FastAPI 应用。"""
 
+import hashlib
+import os
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, File, UploadFile, Query
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from sqlalchemy import func
 
@@ -19,10 +22,11 @@ from bot.plugins.voice_actor.models import (
 )
 from bot.plugins.voice_actor.utils import scan_image_records
 from bot.config import settings
-from .schemas import AliasCreate, VoiceActorCreate, VoiceActorUpdate
+from .schemas import AliasCreate, VoiceActorCreate, VoiceActorUpdate, ImageUpdate
 
 
 STATIC_INDEX = Path(__file__).parent / "static" / "index.html"
+STATIC_DIR = Path(__file__).parent / "static"
 
 
 def ok(data: Any):
@@ -63,7 +67,10 @@ def register_admin_routes(driver) -> None:
             since = datetime.utcnow() - timedelta(hours=24)
             request_24h = (
                 session.query(func.count(RequestLog.id))
-                .filter(RequestLog.created_at >= since)
+                .filter(
+                    RequestLog.created_at >= since,
+                    RequestLog.status != "notfound",
+                )
                 .scalar()
                 or 0
             )
@@ -80,6 +87,7 @@ def register_admin_routes(driver) -> None:
 
             recent_logs = (
                 session.query(RequestLog)
+                .filter(RequestLog.status != "notfound")
                 .order_by(RequestLog.created_at.desc())
                 .limit(20)
                 .all()
@@ -299,6 +307,259 @@ def register_admin_routes(driver) -> None:
             logger.error(f"触发图片同步失败: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="sync failed")
 
+    # ---------- 图片管理 ----------
+
+    VALID_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
+
+    @router.get("/api/images")
+    async def list_images(
+        voice_actor_id: Optional[int] = Query(None),
+        is_active: Optional[bool] = Query(None),
+        search: str = Query(default=""),
+        page: int = Query(default=1, ge=1),
+        page_size: int = Query(default=20, ge=1, le=100),
+    ):
+        """图片列表，支持按声优、状态、文件名筛选和分页。"""
+        session = get_session()
+        try:
+            q = session.query(Image, VoiceActor).join(
+                VoiceActor, VoiceActor.id == Image.voice_actor_id
+            )
+
+            if voice_actor_id is not None:
+                q = q.filter(Image.voice_actor_id == voice_actor_id)
+            if is_active is not None:
+                q = q.filter(Image.is_active == is_active)
+            if search.strip():
+                q = q.filter(Image.filename.contains(search.strip()))
+
+            total = q.count()
+            rows = (
+                q.order_by(Image.created_at.desc())
+                .offset((page - 1) * page_size)
+                .limit(page_size)
+                .all()
+            )
+
+            items = [
+                {
+                    "id": img.id,
+                    "voice_actor_id": img.voice_actor_id,
+                    "voice_actor_name": actor.name,
+                    "filename": img.filename,
+                    "file_path": img.file_path,
+                    "size_kb": img.size_kb or 0,
+                    "file_hash": img.file_hash or "",
+                    "is_active": bool(img.is_active),
+                    "created_at": img.created_at.isoformat() if img.created_at else None,
+                }
+                for img, actor in rows
+            ]
+            return ok(
+                {
+                    "total": total,
+                    "page": page,
+                    "page_size": page_size,
+                    "items": items,
+                }
+            )
+        finally:
+            session.close()
+
+    @router.post("/api/images/upload")
+    async def upload_image(
+        file: UploadFile = File(...),
+        voice_actor_id: int = Query(...),
+    ):
+        """上传图片到指定声优目录。"""
+        session = get_session()
+        try:
+            actor = (
+                session.query(VoiceActor)
+                .filter(VoiceActor.id == voice_actor_id, VoiceActor.is_active == True)
+                .first()
+            )
+            if not actor:
+                raise HTTPException(status_code=404, detail="voice actor not found or inactive")
+
+            # 校验扩展名
+            _, ext = os.path.splitext(file.filename or "")
+            ext_lower = ext.lower()
+            if ext_lower not in VALID_EXTENSIONS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"unsupported file type: {ext_lower}",
+                )
+
+            # 读取文件内容，计算 hash 和大小
+            content = await file.read()
+            file_hash = hashlib.md5(content).hexdigest()
+            size_kb = max(1, len(content) // 1024)
+
+            # 生成目标文件名：{声优名}_{序号}.{ext}
+            actor_dir = Path(settings.image_folder) / actor.name
+            actor_dir.mkdir(parents=True, exist_ok=True)
+
+            # 取该目录下最大序号
+            max_seq = 0
+            existing = session.query(Image).filter(
+                Image.voice_actor_id == voice_actor_id
+            ).all()
+            for img in existing:
+                # 从 filename 中解析序号，如 中岛由贵_003.jpg → 3
+                name_no_ext = img.filename.rsplit(".", 1)[0]
+                parts = name_no_ext.rsplit("_", 1)
+                if len(parts) == 2 and parts[1].isdigit():
+                    max_seq = max(max_seq, int(parts[1]))
+
+            new_seq = max_seq + 1
+            new_filename = f"{actor.name}_{new_seq:03d}{ext_lower}"
+            dest_path = actor_dir / new_filename
+
+            # 写入文件
+            with open(dest_path, "wb") as f:
+                f.write(content)
+
+            # 创建 DB 记录
+            image = Image(
+                voice_actor_id=voice_actor_id,
+                filename=new_filename,
+                file_path=str(dest_path),
+                size_kb=size_kb,
+                file_hash=file_hash,
+                is_active=True,
+            )
+            session.add(image)
+            session.flush()
+
+            # 更新声优 image_count
+            session.query(VoiceActor).filter(VoiceActor.id == voice_actor_id).update(
+                {"image_count": VoiceActor.image_count + 1}
+            )
+            session.commit()
+
+            return ok(
+                {
+                    "id": image.id,
+                    "filename": new_filename,
+                    "voice_actor_id": voice_actor_id,
+                    "size_kb": size_kb,
+                }
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"上传图片失败: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="upload failed")
+        finally:
+            session.close()
+
+    @router.patch("/api/images/{image_id}")
+    async def update_image(image_id: int, payload: ImageUpdate):
+        """切换图片启用/禁用状态。"""
+        session = get_session()
+        try:
+            image = session.query(Image).filter(Image.id == image_id).first()
+            if not image:
+                raise HTTPException(status_code=404, detail="image not found")
+
+            image.is_active = payload.is_active
+            session.commit()
+            return ok({"updated": True})
+        finally:
+            session.close()
+
+    @router.delete("/api/images/{image_id}")
+    async def delete_image(image_id: int):
+        """删除图片（物理文件 + 数据库记录）。"""
+        session = get_session()
+        try:
+            image = session.query(Image).filter(Image.id == image_id).first()
+            if not image:
+                raise HTTPException(status_code=404, detail="image not found")
+
+            voice_actor_id = image.voice_actor_id
+            file_path = image.file_path
+
+            # 删除物理文件
+            try:
+                if file_path and os.path.isfile(file_path):
+                    os.remove(file_path)
+            except Exception as e:
+                logger.warning(f"删除图片文件失败 {file_path}: {e}")
+
+            # 删除数据库记录
+            session.delete(image)
+
+            # 更新声优 image_count（不允许为负）
+            session.query(VoiceActor).filter(VoiceActor.id == voice_actor_id).update(
+                {"image_count": func.greatest(0, VoiceActor.image_count - 1)}
+            )
+            session.commit()
+            return ok({"deleted": True})
+        finally:
+            session.close()
+
+    @router.get("/api/images/{image_id}/file")
+    async def serve_image_file(image_id: int):
+        """返回图片原始文件，用于前端缩略图预览。"""
+        session = get_session()
+        try:
+            image = session.query(Image).filter(Image.id == image_id).first()
+            if not image:
+                raise HTTPException(status_code=404, detail="image not found")
+
+            file_path = image.file_path
+            if not file_path or not os.path.isfile(file_path):
+                raise HTTPException(status_code=404, detail="image file not found on disk")
+
+            # 根据扩展名推断 media_type
+            ext = Path(file_path).suffix.lower()
+            media_map = {
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
+                ".png": "image/png",
+                ".gif": "image/gif",
+                ".webp": "image/webp",
+                ".bmp": "image/bmp",
+            }
+            return FileResponse(file_path, media_type=media_map.get(ext, "image/jpeg"))
+        finally:
+            session.close()
+
+    @router.get("/api/system-info")
+    async def system_info():
+        """返回 bot 进程的 CPU/内存占用和系统信息。"""
+        import psutil
+
+        proc = psutil.Process()
+        cpu_percent = proc.cpu_percent(interval=0.1)
+        mem = proc.memory_info()
+        mem_total = psutil.virtual_memory().total
+        cpu_model = ""
+        try:
+            with open("/proc/cpuinfo") as f:
+                for line in f:
+                    if line.startswith("model name"):
+                        cpu_model = line.split(":", 1)[1].strip()
+                        break
+        except Exception:
+            cpu_model = "Unknown"
+
+        return ok(
+            {
+                "cpu_percent": round(cpu_percent, 1),
+                "memory_mb": round(mem.rss / 1024 / 1024, 1),
+                "memory_total_mb": round(mem_total / 1024 / 1024, 1),
+                "cpu_model": cpu_model,
+            }
+        )
+
     app.include_router(router)
+
+    # 挂载管理后台静态文件（CSS/JS 等）
+    if STATIC_DIR.exists():
+        app.mount("/admin/static", StaticFiles(directory=str(STATIC_DIR)), name="admin_static")
+
     app.state.admin_routes_registered = True
     logger.info("管理后台路由挂载完成: /admin")

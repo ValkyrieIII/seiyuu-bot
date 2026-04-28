@@ -4,397 +4,175 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>QQBot 管理后台 MVP</title>
-    <style>
-        :root {
-            --bg: #f4efe5;
-            --panel: #fffaf2;
-            --ink: #1f2a2e;
-            --brand: #2d6a4f;
-            --brand-2: #bc6c25;
-            --danger: #b00020;
-            --line: #dccfb8;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
-            color: var(--ink);
-            background: radial-gradient(circle at top right, #f0d9b6, transparent 38%), var(--bg);
-        }
-
-        header {
-            padding: 20px;
-            background: linear-gradient(90deg, var(--brand), #4f772d);
-            color: #fff;
-        }
-
-        main {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 14px;
-            padding: 14px;
-        }
-
-        .card {
-            background: var(--panel);
-            border: 1px solid var(--line);
-            border-radius: 12px;
-            padding: 14px;
-            box-shadow: 0 5px 14px rgba(0, 0, 0, .06);
-        }
-
-        h2 {
-            margin: 4px 0 10px;
-            font-size: 18px;
-        }
-
-        .metrics {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-        }
-
-        .metric {
-            border: 1px dashed var(--line);
-            border-radius: 10px;
-            padding: 8px;
-            background: #fff;
-        }
-
-        .metric .label {
-            font-size: 12px;
-            opacity: .75;
-        }
-
-        .metric .value {
-            font-size: 22px;
-            font-weight: 700;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-        }
-
-        th,
-        td {
-            padding: 6px;
-            border-bottom: 1px solid #ebdfcb;
-            text-align: left;
-        }
-
-        input,
-        select,
-        button,
-        textarea {
-            width: 100%;
-            padding: 8px;
-            margin: 4px 0;
-            border: 1px solid #cebfa8;
-            border-radius: 8px;
-            background: #fff;
-        }
-
-        button {
-            cursor: pointer;
-            background: var(--brand);
-            color: #fff;
-            border: none;
-        }
-
-        button.secondary {
-            background: var(--brand-2);
-        }
-
-        button.danger {
-            background: var(--danger);
-        }
-
-        .inline {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
-
-        .status {
-            font-size: 13px;
-            min-height: 20px;
-        }
-
-        .logs {
-            max-height: 260px;
-            overflow: auto;
-        }
-    </style>
+    <title>QQBot 管理后台</title>
+    <link rel="stylesheet" href="/admin/static/admin.css" />
 </head>
 
 <body>
-    <header>
-        <h1>QQBot 管理后台 MVP</h1>
-        <div>路径: /admin · 同进程管理面板</div>
-    </header>
+    <!-- Toast 容器 -->
+    <div class="toast-container" id="toastContainer" role="status" aria-live="polite"></div>
 
-    <main>
-        <section class="card">
-            <h2>概览</h2>
-            <div class="metrics" id="metrics"></div>
-            <h3>最近 20 条请求</h3>
-            <div class="logs">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>时间</th>
-                            <th>用户</th>
-                            <th>状态</th>
-                            <th>耗时</th>
-                        </tr>
-                    </thead>
-                    <tbody id="logRows"></tbody>
-                </table>
+    <div class="app-layout">
+
+        <!-- ============ 侧边栏 ============ -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                QQBot
+                <small>Admin Console</small>
             </div>
-            <button class="secondary" id="refreshOverview">刷新概览</button>
-        </section>
-
-        <section class="card">
-            <h2>声优管理</h2>
-            <div class="inline">
-                <input id="actorName" placeholder="声优名称" />
-                <input id="actorDesc" placeholder="描述(可选)" />
+            <nav class="sidebar-nav">
+                <a class="nav-item active" data-tab="overview" data-title="概览" data-desc="系统关键指标与最近请求记录" href="#overview" aria-current="page">
+                    <span class="nav-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1h-4a1 1 0 01-1-1v-5zm-10 3a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1v-2z"/></svg></span>概览
+                </a>
+                <a class="nav-item" data-tab="actors" data-title="声优管理" data-desc="新增、查看和启用/禁用声优" href="#actors">
+                    <span class="nav-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></span>声优管理
+                </a>
+                <a class="nav-item" data-tab="images" data-title="图片管理" data-desc="浏览、上传和管理声优图片" href="#images">
+                    <span class="nav-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></span>图片管理
+                </a>
+                <a class="nav-item" data-tab="aliases" data-title="别名管理" data-desc="管理全局别名映射，将关键词路由到目标声优" href="#aliases">
+                    <span class="nav-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg></span>别名管理
+                </a>
+                <a class="nav-item" data-tab="sync" data-title="图片同步" data-desc="对文件系统与数据库做增量同步" href="#sync">
+                    <span class="nav-icon"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></span>图片同步
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <span class="status-dot pulse" id="statusDot"></span>
+                <span id="statusText">就绪</span>
             </div>
-            <button id="addActor">新增声优</button>
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>名称</th>
-                        <th>图片数</th>
-                        <th>启用</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody id="actorRows"></tbody>
-            </table>
-        </section>
+        </aside>
 
-        <section class="card">
-            <h2>别名管理</h2>
-            <div class="inline">
-                <input id="aliasName" placeholder="别名" />
-                <select id="aliasTarget"></select>
+        <!-- ============ 主内容区 ============ -->
+        <main class="main-content">
+
+            <!-- ===== Glass Header ===== -->
+            <div class="glass-header">
+                <div>
+                    <span class="tab-title" id="tabTitle">概览</span>
+                    <span class="tab-desc" id="tabDesc">系统关键指标与最近请求记录</span>
+                </div>
+                <div class="glass-header-actions">
+                    <button class="small secondary" id="headerRefreshBtn" style="display:none">刷新</button>
+                </div>
             </div>
-            <div class="inline">
-                <input id="aliasPriority" type="number" placeholder="优先级" value="0" />
-                <button id="addAlias">新增别名</button>
+
+            <div class="page-body">
+
+                <!-- ===== 概览 ===== -->
+                <section class="tab-panel active" id="tab-overview">
+                    <div class="stat-grid" id="overviewMetrics"></div>
+                    <div id="systemGauges">
+                        <span class="empty-state" style="padding:20px"><p>加载中...</p></span>
+                    </div>
+                    <div class="card">
+                        <h3>最近 20 条请求</h3>
+                        <div id="overviewLogs"></div>
+                        <button class="small secondary" id="refreshOverview" style="margin-top:12px;width:auto">刷新</button>
+                    </div>
+                </section>
+
+                <!-- ===== 声优管理 ===== -->
+                <section class="tab-panel" id="tab-actors">
+                    <div class="card">
+                        <div class="inline">
+                            <div>
+                                <label for="actorName">声优名称</label>
+                                <input id="actorName" placeholder="输入声优名称" autocomplete="off" />
+                            </div>
+                            <div>
+                                <label for="actorDesc">描述（可选）</label>
+                                <input id="actorDesc" placeholder="简短描述" autocomplete="off" />
+                            </div>
+                        </div>
+                        <button id="addActor" style="width:auto;margin-top:8px">新增声优</button>
+                    </div>
+                    <div class="card">
+                        <div class="search-bar">
+                            <input id="searchActor" placeholder="搜索声优..." autocomplete="off" style="max-width:280px" />
+                        </div>
+                        <div id="actorTable"></div>
+                    </div>
+                </section>
+
+                <!-- ===== 图片管理 ===== -->
+                <section class="tab-panel" id="tab-images">
+                    <div class="card">
+                        <h3>上传图片</h3>
+                        <div class="inline">
+                            <div>
+                                <label for="imgUploadActor">目标声优</label>
+                                <select id="imgUploadActor"></select>
+                            </div>
+                            <div>
+                                <label for="imgFileInput">选择图片</label>
+                                <input type="file" id="imgFileInput" accept="image/*" />
+                            </div>
+                        </div>
+                        <button id="uploadImgBtn" style="width:auto;margin-top:8px">上传</button>
+                    </div>
+                    <div class="card">
+                        <div class="inline">
+                            <div>
+                                <label for="imgFilterActor">按声优筛选</label>
+                                <select id="imgFilterActor">
+                                    <option value="">全部声优</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="imgSearch">搜索文件名</label>
+                                <input id="imgSearch" placeholder="搜索文件名..." autocomplete="off" style="max-width:280px" />
+                            </div>
+                        </div>
+                        <div id="imageTable"></div>
+                        <div id="imagePagination" class="pagination"></div>
+                    </div>
+                </section>
+
+                <!-- ===== 别名管理 ===== -->
+                <section class="tab-panel" id="tab-aliases">
+                    <div class="card">
+                        <div class="inline">
+                            <div>
+                                <label for="aliasName">别名</label>
+                                <input id="aliasName" placeholder="输入别名" autocomplete="off" />
+                            </div>
+                            <div>
+                                <label for="aliasTarget">目标声优</label>
+                                <select id="aliasTarget"></select>
+                            </div>
+                        </div>
+                        <div class="inline">
+                            <div>
+                                <label for="aliasPriority">优先级</label>
+                                <input id="aliasPriority" type="number" placeholder="0" value="0" />
+                            </div>
+                            <div style="display:flex;align-items:flex-end">
+                                <button id="addAlias">新增别名</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="search-bar">
+                            <input id="searchAlias" placeholder="搜索别名..." autocomplete="off" style="max-width:280px" />
+                        </div>
+                        <div id="aliasTable"></div>
+                    </div>
+                </section>
+
+                <!-- ===== 图片同步 ===== -->
+                <section class="tab-panel" id="tab-sync">
+                    <div class="card">
+                        <button id="syncBtn" style="width:auto">执行同步</button>
+                        <div id="syncResult"></div>
+                    </div>
+                </section>
+
             </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>别名</th>
-                        <th>目标声优</th>
-                        <th>优先级</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody id="aliasRows"></tbody>
-            </table>
-        </section>
+        </main>
+    </div>
 
-        <section class="card">
-            <h2>图片同步</h2>
-            <p>触发 scan_image_records，对文件系统与数据库做增量同步。</p>
-            <button id="syncBtn">执行同步</button>
-            <pre id="syncResult"></pre>
-            <div class="status" id="statusText"></div>
-        </section>
-    </main>
-
-    <script>
-        async function api(path, options = {}) {
-            const res = await fetch(path, {
-                headers: { "Content-Type": "application/json" },
-                ...options
-            });
-            const body = await res.json();
-            if (!res.ok || body.success === false) throw new Error(body.detail || body.error || "请求失败");
-            return body.data;
-        }
-
-        function setStatus(msg, isError = false) {
-            const el = document.getElementById("statusText");
-            el.textContent = msg;
-            el.style.color = isError ? "#b00020" : "#2d6a4f";
-        }
-
-        async function loadOverview() {
-            const data = await api("/admin/api/overview");
-            const metrics = document.getElementById("metrics");
-            metrics.innerHTML = "";
-            const items = [
-                ["声优总数", data.voice_actor_total],
-                ["图片总数", data.image_total],
-                ["别名总数", data.alias_total],
-                ["24h 请求", data.request_24h],
-                ["24h 成功率", data.success_rate_24h + "%"]
-            ];
-            items.forEach(([label, value]) => {
-                const div = document.createElement("div");
-                div.className = "metric";
-                div.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
-                metrics.appendChild(div);
-            });
-
-            const logRows = document.getElementById("logRows");
-            logRows.innerHTML = "";
-            data.recent_logs.forEach(log => {
-                const tr = document.createElement("tr");
-                tr.innerHTML = `<td>${(log.created_at || "").replace("T", " ").slice(0, 19)}</td><td>${log.user_id || "-"}</td><td>${log.status || "-"}</td><td>${log.response_time_ms || "-"} ms</td>`;
-                logRows.appendChild(tr);
-            });
-        }
-
-        async function loadActors() {
-            const actors = await api("/admin/api/voice-actors");
-            const rows = document.getElementById("actorRows");
-            const aliasTarget = document.getElementById("aliasTarget");
-            rows.innerHTML = "";
-            aliasTarget.innerHTML = "";
-
-            actors.forEach(actor => {
-                const tr = document.createElement("tr");
-                tr.innerHTML = `
-          <td>${actor.id}</td>
-          <td>${actor.name}</td>
-          <td>${actor.image_count}</td>
-          <td>${actor.is_active ? "是" : "否"}</td>
-          <td><button data-id="${actor.id}" data-active="${actor.is_active}" class="toggleActor">切换启用</button></td>
-        `;
-                rows.appendChild(tr);
-
-                const option = document.createElement("option");
-                option.value = actor.id;
-                option.textContent = `${actor.name} (#${actor.id})`;
-                aliasTarget.appendChild(option);
-            });
-
-            document.querySelectorAll(".toggleActor").forEach(btn => {
-                btn.addEventListener("click", async () => {
-                    const id = Number(btn.dataset.id);
-                    const active = btn.dataset.active === "true";
-                    await api(`/admin/api/voice-actors/${id}`, {
-                        method: "PATCH",
-                        body: JSON.stringify({ is_active: !active })
-                    });
-                    setStatus("声优状态已更新");
-                    await Promise.all([loadActors(), loadOverview()]);
-                });
-            });
-        }
-
-        async function loadAliases() {
-            const aliases = await api("/admin/api/aliases");
-            const rows = document.getElementById("aliasRows");
-            rows.innerHTML = "";
-            aliases.forEach(item => {
-                const tr = document.createElement("tr");
-                tr.innerHTML = `
-          <td>${item.id}</td>
-          <td>${item.alias_name}</td>
-          <td>${item.target_voice_actor_name}</td>
-          <td>${item.priority}</td>
-          <td><button class="danger" data-id="${item.id}">删除</button></td>
-        `;
-                rows.appendChild(tr);
-            });
-
-            rows.querySelectorAll("button.danger").forEach(btn => {
-                btn.addEventListener("click", async () => {
-                    const id = Number(btn.dataset.id);
-                    await api(`/admin/api/aliases/${id}`, { method: "DELETE" });
-                    setStatus("别名已删除");
-                    await Promise.all([loadAliases(), loadOverview()]);
-                });
-            });
-        }
-
-        document.getElementById("refreshOverview").addEventListener("click", async () => {
-            try {
-                await loadOverview();
-                setStatus("概览刷新完成");
-            } catch (e) {
-                setStatus(e.message, true);
-            }
-        });
-
-        document.getElementById("addActor").addEventListener("click", async () => {
-            const name = document.getElementById("actorName").value.trim();
-            const description = document.getElementById("actorDesc").value.trim();
-            if (!name) {
-                setStatus("请输入声优名称", true);
-                return;
-            }
-            try {
-                await api("/admin/api/voice-actors", {
-                    method: "POST",
-                    body: JSON.stringify({ name, description })
-                });
-                document.getElementById("actorName").value = "";
-                document.getElementById("actorDesc").value = "";
-                setStatus("新增声优成功");
-                await Promise.all([loadActors(), loadOverview()]);
-            } catch (e) {
-                setStatus(e.message, true);
-            }
-        });
-
-        document.getElementById("addAlias").addEventListener("click", async () => {
-            const alias_name = document.getElementById("aliasName").value.trim();
-            const target_voice_actor_id = Number(document.getElementById("aliasTarget").value);
-            const priority = Number(document.getElementById("aliasPriority").value || 0);
-            if (!alias_name || !target_voice_actor_id) {
-                setStatus("请填写别名并选择目标声优", true);
-                return;
-            }
-            try {
-                await api("/admin/api/aliases", {
-                    method: "POST",
-                    body: JSON.stringify({ alias_name, target_voice_actor_id, priority })
-                });
-                document.getElementById("aliasName").value = "";
-                setStatus("新增别名成功");
-                await Promise.all([loadAliases(), loadOverview()]);
-            } catch (e) {
-                setStatus(e.message, true);
-            }
-        });
-
-        document.getElementById("syncBtn").addEventListener("click", async () => {
-            try {
-                setStatus("同步中...");
-                const data = await api("/admin/api/sync-images", { method: "POST" });
-                document.getElementById("syncResult").textContent = JSON.stringify(data, null, 2);
-                setStatus("图片同步完成");
-                await Promise.all([loadOverview(), loadActors(), loadAliases()]);
-            } catch (e) {
-                setStatus(e.message, true);
-            }
-        });
-
-        (async function init() {
-            try {
-                await Promise.all([loadOverview(), loadActors(), loadAliases()]);
-                setStatus("后台已就绪");
-            } catch (e) {
-                setStatus(e.message, true);
-            }
-        })();
-    </script>
+    <script src="/admin/static/admin.js"></script>
 </body>
 
 </html>

@@ -19,3 +19,7 @@ class AliasCreate(BaseModel):
     target_voice_actor_id: int
     priority: int = 0
     description: str = Field(default="", max_length=2000)
+
+
+class ImageUpdate(BaseModel):
+    is_active: bool
