@@ -31,6 +31,7 @@ from bot.plugins.voice_actor.utils import (
     initialize_image_records,
     scan_image_records,
 )
+from bot.plugins.mention_command.services import CheckInService
 from loguru import logger
 
 
@@ -126,6 +127,7 @@ def show_help():
     print("  init-images-db              初始化图片命名并重建数据库记录")
     print("  scan-images-db              扫描文件系统并自动重命名后同步数据库（软删除）")
     print("  sync-database               等同 scan-images-db（兼容旧命令）")
+    print("  reset-checkins              清空签到表所有记录")
     print("  help                        显示此帮助信息")
     print()
 
@@ -166,6 +168,18 @@ def main():
             print(f"❌ 重命名失败: {rename_failed_total}")
         print("=" * 60)
         sys.exit(0)
+
+    elif command == "reset-checkins":
+        print("=" * 60)
+        print("清空签到表")
+        print("=" * 60)
+        try:
+            count = CheckInService.reset_table()
+            print(f"✅ 签到表已重置，删除 {count} 条记录")
+        except Exception as e:
+            print(f"❌ 重置签到表失败: {e}")
+            logger.error(f"重置签到表失败: {e}", exc_info=True)
+            sys.exit(1)
 
     elif command == "scan-images-db" or command == "sync-database":
         print("=" * 60)

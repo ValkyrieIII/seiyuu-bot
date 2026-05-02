@@ -97,6 +97,15 @@ class ImageService:
             session.close()
 
     @staticmethod
+    def get_image_by_id(image_id: int) -> Optional[Image]:
+        """根据ID获取图片"""
+        session = get_session()
+        try:
+            return session.query(Image).filter(Image.id == image_id).first()
+        finally:
+            session.close()
+
+    @staticmethod
     def get_images_by_actor_id(voice_actor_id: int, limit: int = 100) -> List[Image]:
         """获取声优的所有图片"""
         session = get_session()
