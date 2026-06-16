@@ -91,11 +91,11 @@ def main():
         # 注册 OneBot v11 适配器
         driver.register_adapter(Adapter)
 
+        # 加载插件（必须在 register_admin_routes 之前，避免路由层提前 import 导致插件注册失败）
+        nonebot.load_plugins("bot/plugins")
+
         # 挂载管理后台路由
         register_admin_routes(driver)
-
-        # 加载插件
-        nonebot.load_plugins("bot/plugins")
 
         logger.info("所有插件加载完成")
 

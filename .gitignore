@@ -62,3 +62,5 @@ database/backups/
 *.temp
 
 参考文件
+
+.claude

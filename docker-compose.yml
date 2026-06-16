@@ -25,6 +25,38 @@ services:
       interval: 10s
     restart: unless-stopped
 
+  # Tailscale VPN sidecar — 将出口流量通过笔记本路由到中大校园网
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: qqbot-tailscale
+    hostname: DESKTOP-SYSU01
+    environment:
+      TS_AUTHKEY: ${TAILSCALE_AUTH_KEY}
+      TS_STATE_DIR: /var/lib/tailscale/state
+      TS_USERSPACE: "false"
+      TS_EXTRA_ARGS: >
+        --exit-node=${TAILSCALE_EXIT_NODE}
+        --exit-node-allow-lan-access=true
+        --accept-dns=false
+    volumes:
+      - tailscale_state:/var/lib/tailscale/state
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    ports:
+      - "${NONEBOT_PORT:-8080}:8080"   # nonebot 管理后台 + 反向WS
+      - "6099:6099"                      # napcat web UI
+    networks:
+      - qqbot_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "tailscale", "status", "--active"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
   # NoneBot 应用服务
   nonebot:
     build:
@@ -32,6 +64,7 @@ services:
       dockerfile: Dockerfile
     container_name: qqbot-nonebot
     user: "${UID:-1000}:${GID:-1000}"
+    network_mode: "service:tailscale"
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
@@ -41,7 +74,6 @@ services:
       DRIVER: ${DRIVER:-~fastapi}
       HOST: ${HOST:-0.0.0.0}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      NONEBOT_ADAPTER_ONEBOT_WS_REVERSE_SERVERS: '[\"${SERVER_IP}:8080\"]'
       NONEBOT_ADAPTER_ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:-s~N9cCeg-SDmpwWM}
       NAPCAT_HOST: ${NAPCAT_HOST:-napcat}
       NAPCAT_PORT: ${NAPCAT_PORT:-3001}
@@ -52,8 +84,6 @@ services:
       LANG: C.UTF-8
       LC_ALL: C.UTF-8
       PYTHONIOENCODING: utf-8
-    ports:
-      - "${NONEBOT_PORT:-8080}:8080"
     volumes:
       - ./backend/bot:/app/bot
       - ./images:/app/images
@@ -62,8 +92,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    networks:
-      - qqbot_network
+      tailscale:
+        condition: service_started
     restart: unless-stopped
     command: python -m bot.main
 
@@ -71,20 +101,18 @@ services:
   napcat:
     image: mlikiowa/napcat-docker:latest
     container_name: qqbot-napcat
+    network_mode: "service:tailscale"
     environment:
-      NAPCAT_ADMIN_ENDPOINT: "http://0.0.0.0:3000"
-      NAPCAT_WS_ENDPOINT: "ws://0.0.0.0:3001"
-      # OneBot v11 反向 WebSocket 配置
-      # NapCat 会主动连接到 NoneBot 推送消息
-      NAPCAT_ONEBOT_V11_REVERSE_WS: "ws://${SERVER_IP}:8080/onebot/v11/ws"
-    ports:
-      - "6099:6099"
+      NAPCAT_UID: "${UID:-1000}"
+      NAPCAT_GID: "${GID:-1000}"
+      NAPCAT_ADMIN_ENDPOINT: "http://localhost:3000"
+      NAPCAT_WS_ENDPOINT: "ws://localhost:3001"
+      NAPCAT_ONEBOT_V11_REVERSE_WS: "ws://localhost:8080/onebot/v11/ws"
     volumes:
       - napcat_data:/opt/napcat/data
-      - ./images:/app/images:ro
+      - ./images:/app/images
       - napcat_plugins:/app/napcat/plugins
-    networks:
-      - qqbot_network
+      - napcat_qq_config:/app/.config/QQ
     restart: unless-stopped
 
 volumes:
@@ -93,6 +121,10 @@ volumes:
   napcat_data:
     driver: local
   napcat_plugins:
+    driver: local
+  napcat_qq_config:
+    driver: local
+  tailscale_state:
     driver: local
 
 networks:

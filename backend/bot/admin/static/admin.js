@@ -731,14 +731,58 @@
 
     function bindImageActions() {
         var uploadBtn = document.getElementById("uploadImgBtn");
+        var fileInput = document.getElementById("imgFileInput");
+        var fileList = document.getElementById("imgFileList");
+
+        // 选择文件后展示预览列表
+        if (fileInput && fileList) {
+            fileInput.addEventListener("change", function () {
+                var files = fileInput.files;
+                fileList.innerHTML = "";
+                if (files.length === 0) {
+                    fileList.style.display = "none";
+                    return;
+                }
+                fileList.style.display = "flex";
+                for (var i = 0; i < files.length; i++) {
+                    (function (f, idx) {
+                        var item = document.createElement("div");
+                        item.className = "img-file-item";
+                        var nameSpan = document.createElement("span");
+                        nameSpan.className = "img-file-name";
+                        nameSpan.textContent = f.name;
+                        var sizeSpan = document.createElement("span");
+                        sizeSpan.className = "img-file-size";
+                        sizeSpan.textContent = (f.size / 1024).toFixed(1) + " KB";
+                        var delSpan = document.createElement("span");
+                        delSpan.className = "img-file-del";
+                        delSpan.textContent = "✕";
+                        delSpan.title = "移除";
+                        delSpan.addEventListener("click", function () {
+                            // 从 FileList 中移除该项（通过 DataTransfer）
+                            var dt = new DataTransfer();
+                            for (var j = 0; j < fileInput.files.length; j++) {
+                                if (j !== idx) dt.items.add(fileInput.files[j]);
+                            }
+                            fileInput.files = dt.files;
+                            fileInput.dispatchEvent(new Event("change"));
+                        });
+                        item.appendChild(nameSpan);
+                        item.appendChild(sizeSpan);
+                        item.appendChild(delSpan);
+                        fileList.appendChild(item);
+                    })(files[i], i);
+                }
+            });
+        }
+
         if (uploadBtn) {
             uploadBtn.addEventListener("click", function () {
-                var fileInput = document.getElementById("imgFileInput");
                 var actorSelect = document.getElementById("imgUploadActor");
-                var file = fileInput.files[0];
+                var files = fileInput.files;
                 var actorId = actorSelect.value;
 
-                if (!file) {
+                if (files.length === 0) {
                     showToast("请选择图片文件", "warning");
                     return;
                 }
@@ -748,7 +792,9 @@
                 }
 
                 var formData = new FormData();
-                formData.append("file", file);
+                for (var i = 0; i < files.length; i++) {
+                    formData.append("files", files[i]);
+                }
 
                 withLoading(uploadBtn,
                     fetch(API_BASE + "/images/upload?voice_actor_id=" + encodeURIComponent(actorId), {
@@ -756,9 +802,30 @@
                         body: formData,
                     }).then(function (res) { return res.json(); })
                     .then(function (body) {
-                        if (!body.success) throw new Error(body.detail || "上传失败");
+                        if (!body.success) {
+                            var detail = body.detail;
+                            if (typeof detail !== "string") detail = JSON.stringify(detail);
+                            throw new Error(detail || "上传失败");
+                        }
                         fileInput.value = "";
-                        showToast("上传成功", "success");
+                        if (fileList) { fileList.style.display = "none"; fileList.innerHTML = ""; }
+
+                        var data = body.data || {};
+                        var results = data.results || [];
+                        var okCount = 0;
+                        var failList = [];
+                        results.forEach(function (r) {
+                            if (r.status === "ok") okCount++;
+                            else failList.push(r.filename || "unknown");
+                        });
+
+                        var msg = "上传完成: 成功 " + okCount + " 张";
+                        if (failList.length > 0) {
+                            msg += "，失败 " + failList.length + " 张 (" + failList.join(", ") + ")";
+                            showToast(msg, "warning");
+                        } else {
+                            showToast(msg, "success");
+                        }
                         return loadImages(imagePage);
                     })
                 ).catch(function (e) {

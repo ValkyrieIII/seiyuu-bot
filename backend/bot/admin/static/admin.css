@@ -970,6 +970,48 @@ input:focus+.toggle-slider {
 }
 
 /* ============================================================
+   Image file list (multi-upload preview)
+   ============================================================ */
+.img-file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+.img-file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.img-file-item .img-file-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.img-file-item .img-file-size {
+    color: var(--muted);
+    flex-shrink: 0;
+}
+
+.img-file-item .img-file-del {
+    cursor: pointer;
+    color: var(--danger);
+    flex-shrink: 0;
+    font-size: 14px;
+    line-height: 1;
+}
+
+/* ============================================================
    Animations
    ============================================================ */
 @keyframes fadeIn {

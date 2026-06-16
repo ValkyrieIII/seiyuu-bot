@@ -5,7 +5,7 @@ import hashlib
 import os
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, HTTPException, File, UploadFile, Query
 from fastapi.responses import FileResponse
@@ -13,16 +13,11 @@ from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from sqlalchemy import func
 
-from bot.plugins.voice_actor.models import (
-    Alias,
-    Image,
-    RequestLog,
-    VoiceActor,
-    get_session,
-)
-from bot.plugins.voice_actor.utils import scan_image_records
 from bot.config import settings
 from .schemas import AliasCreate, VoiceActorCreate, VoiceActorUpdate, ImageUpdate
+
+# voice_actor 模型/工具延迟导入，避免在 NoneBot 插件加载前 import 导致插件注册失败
+# 实际导入在 register_admin_routes() 内部完成
 
 
 STATIC_INDEX = Path(__file__).parent / "static" / "index.html"
@@ -44,6 +39,16 @@ def register_admin_routes(driver) -> None:
     if getattr(app.state, "admin_routes_registered", False):
         logger.info("管理后台路由已注册，跳过重复挂载")
         return
+
+    # 延迟导入 voice_actor 模型（避免在 NoneBot 插件加载前触发 import）
+    from bot.plugins.voice_actor.models import (
+        Alias,
+        Image,
+        RequestLog,
+        VoiceActor,
+        get_session,
+    )
+    from bot.plugins.voice_actor.utils import scan_image_records
 
     # 管理后台统一前缀，便于反向代理和权限隔离
     router = APIRouter(prefix="/admin", tags=["admin"])
@@ -367,11 +372,11 @@ def register_admin_routes(driver) -> None:
             session.close()
 
     @router.post("/api/images/upload")
-    async def upload_image(
-        file: UploadFile = File(...),
+    async def upload_images(
+        files: List[UploadFile] = File(...),
         voice_actor_id: int = Query(...),
     ):
-        """上传图片到指定声优目录。"""
+        """上传图片到指定声优目录，支持批量。"""
         session = get_session()
         try:
             actor = (
@@ -382,70 +387,84 @@ def register_admin_routes(driver) -> None:
             if not actor:
                 raise HTTPException(status_code=404, detail="voice actor not found or inactive")
 
-            # 校验扩展名
-            _, ext = os.path.splitext(file.filename or "")
-            ext_lower = ext.lower()
-            if ext_lower not in VALID_EXTENSIONS:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"unsupported file type: {ext_lower}",
-                )
-
-            # 读取文件内容，计算 hash 和大小
-            content = await file.read()
-            file_hash = hashlib.md5(content).hexdigest()
-            size_kb = max(1, len(content) // 1024)
-
-            # 生成目标文件名：{声优名}_{序号}.{ext}
             actor_dir = Path(settings.image_folder) / actor.name
             actor_dir.mkdir(parents=True, exist_ok=True)
 
-            # 取该目录下最大序号
+            # 取该目录下最大序号（一次性查询，后续递增）
             max_seq = 0
             existing = session.query(Image).filter(
                 Image.voice_actor_id == voice_actor_id
             ).all()
             for img in existing:
-                # 从 filename 中解析序号，如 中岛由贵_003.jpg → 3
                 name_no_ext = img.filename.rsplit(".", 1)[0]
                 parts = name_no_ext.rsplit("_", 1)
                 if len(parts) == 2 and parts[1].isdigit():
                     max_seq = max(max_seq, int(parts[1]))
 
-            new_seq = max_seq + 1
-            new_filename = f"{actor.name}_{new_seq:03d}{ext_lower}"
-            dest_path = actor_dir / new_filename
+            results = []
+            new_seq = max_seq
 
-            # 写入文件
-            with open(dest_path, "wb") as f:
-                f.write(content)
+            for file in files:
+                try:
+                    # 校验扩展名
+                    _, ext = os.path.splitext(file.filename or "")
+                    ext_lower = ext.lower()
+                    if ext_lower not in VALID_EXTENSIONS:
+                        results.append({
+                            "filename": file.filename,
+                            "status": "error",
+                            "detail": f"unsupported file type: {ext_lower}",
+                        })
+                        continue
 
-            # 创建 DB 记录
-            image = Image(
-                voice_actor_id=voice_actor_id,
-                filename=new_filename,
-                file_path=str(dest_path),
-                size_kb=size_kb,
-                file_hash=file_hash,
-                is_active=True,
-            )
-            session.add(image)
-            session.flush()
+                    # 读取文件内容，计算 hash 和大小
+                    content = await file.read()
+                    file_hash = hashlib.md5(content).hexdigest()
+                    size_kb = max(1, len(content) // 1024)
 
-            # 更新声优 image_count
-            session.query(VoiceActor).filter(VoiceActor.id == voice_actor_id).update(
-                {"image_count": VoiceActor.image_count + 1}
-            )
+                    new_seq += 1
+                    new_filename = f"{actor.name}_{new_seq:03d}{ext_lower}"
+                    dest_path = actor_dir / new_filename
+
+                    # 写入文件
+                    with open(dest_path, "wb") as f:
+                        f.write(content)
+
+                    # 创建 DB 记录
+                    image = Image(
+                        voice_actor_id=voice_actor_id,
+                        filename=new_filename,
+                        file_path=str(dest_path),
+                        size_kb=size_kb,
+                        file_hash=file_hash,
+                        is_active=True,
+                    )
+                    session.add(image)
+                    session.flush()
+
+                    # 更新声优 image_count
+                    session.query(VoiceActor).filter(VoiceActor.id == voice_actor_id).update(
+                        {"image_count": VoiceActor.image_count + 1}
+                    )
+
+                    results.append({
+                        "filename": new_filename,
+                        "status": "ok",
+                        "id": image.id,
+                        "voice_actor_id": voice_actor_id,
+                        "size_kb": size_kb,
+                    })
+                except Exception as e:
+                    logger.error(f"上传图片 {file.filename} 失败: {e}", exc_info=True)
+                    results.append({
+                        "filename": file.filename,
+                        "status": "error",
+                        "detail": str(e),
+                    })
+
             session.commit()
 
-            return ok(
-                {
-                    "id": image.id,
-                    "filename": new_filename,
-                    "voice_actor_id": voice_actor_id,
-                    "size_kb": size_kb,
-                }
-            )
+            return ok({"results": results})
         except HTTPException:
             raise
         except Exception as e:

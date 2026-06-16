@@ -12,7 +12,6 @@ from nonebot.matcher import Matcher
 from nonebot.rule import to_me
 from nonebot.exception import FinishedException
 
-from bot.plugins.voice_actor.services import VoiceActorService, ImageService
 from bot.plugins.mention_command.services import CheckInService
 
 # 仅处理 @bot 消息；优先于 voice_actor 插件（voice_actor 为 priority=50）
@@ -22,6 +21,9 @@ mention_command_matcher = on_message(rule=to_me(), priority=20, block=False)
 @mention_command_matcher.handle()
 async def handle_mention_command(event: MessageEvent, matcher: Matcher):
     """处理 @bot 命令"""
+    # 延迟导入，避免在 voice_actor 插件加载前触发import导致注册失败
+    from bot.plugins.voice_actor.services import VoiceActorService, ImageService
+
     message_text = event.get_plaintext().strip()
 
     group_id = None
@@ -55,7 +57,7 @@ async def handle_mention_command(event: MessageEvent, matcher: Matcher):
             if lucky_actor_id:
                 actor = VoiceActorService.get_voice_actor_by_id(lucky_actor_id)
                 if actor:
-                    text += f"\n今天你的幸运女声优是：{actor.name}"
+                    text += f"\n今天你的妈妈是：{actor.name}"
 
                     image = (
                         ImageService.get_image_by_id(lucky_image_id)
