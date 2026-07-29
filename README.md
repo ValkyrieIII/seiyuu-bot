@@ -151,46 +151,6 @@ python3 scripts/manage_aliases.py remove 贵贵
 - 插件启动时会执行一次扫描
 - 文件系统监听器会在目录变更后自动触发增量同步
 
-## 常见问题
-
-### 1) 机器人不回图
-
-优先检查：
-
-- 目标声优目录是否存在有效图片
-- 别名是否正确映射到声优
-- 图片是否已执行同步（sync-database）
-- nonebot 日志是否有 file_missing/no_image 错误
-
-
-
-### 2) NapCat 连不上 NoneBot
-
-重点检查：
-
-- napcat webui中的网络配置
-- ONEBOT_ACCESS_TOKEN 两侧是否一致
-
-### 3) 管理后台打不开
-
-重点检查：
-
-- nonebot 容器是否健康运行
-- 8080 端口映射是否被占用
-- 访问地址是否正确（/admin）
-- 
-### 4) images 目录重启后变成 root 属主
-
-本项目默认策略：
-
-- nonebot 使用宿主机 UID/GID 运行，写入 images 时保持宿主机属主
-- napcat 对 images 使用只读挂载，避免第三方容器改写属主
-
-如果你的服务器用户不是 uid/gid 1000，请修改 .env 中 UID/GID 后重启：
-
-```bash
-docker compose up -d --force-recreate
-```
 
 <!-- ## 开发说明
 
