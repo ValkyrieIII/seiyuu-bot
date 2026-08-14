@@ -62,8 +62,7 @@
 │   └── seed.sql                    # 初始数据
 ├── docs/
 │   ├── API.md
-│   ├── DATABASE.md
-│   └── superpowers/plans/          # 开发计划文档
+│   └── DATABASE.md
 ├── images/                         # 声优图片目录（按声优名分文件夹）
 ├── logs/
 ├── docker-compose.yml
