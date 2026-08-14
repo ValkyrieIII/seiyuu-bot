@@ -64,3 +64,8 @@ database/backups/
 参考文件
 
 .claude
+
+/superpowers
+# superpowers 工作目录（计划/审查稿，不提交）
+docs/superpowers/
+.superpowers/

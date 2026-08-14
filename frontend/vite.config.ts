@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
+import { viteMockServe } from 'vite-plugin-mock'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -18,6 +19,11 @@ export default defineConfig({
     Components({
       resolvers: [ElementPlusResolver()],
       dts: 'src/components.d.ts',
+    }),
+    // 开发期 mock 数据层：拦截 /admin/api/* 返回假数据（仅 serve 模式生效，build 产物不含 mock）
+    viteMockServe({
+      mockPath: 'mock',
+      logger: true,
     }),
   ],
   server: {
