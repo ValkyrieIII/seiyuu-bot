@@ -1,38 +1,22 @@
-# 声优图片系统（QQ 群接入 + Web 管理后台）
+# QQ 声优机器人
 
-真实生产运行的双端系统：同一套后端同时支撑 **QQ 群机器人接入** 与 **Web 管理后台**。
+基于 NoneBot2 + OneBot v11 + NapCat + MySQL 的群聊声优图片机器人。
 
-- QQ 群接入：基于 NoneBot2 + OneBot v11 + NapCat，群内发送声优名/别名即可匹配并返回随机图片，支持 @机器人 签到、声优列表
-- Web 管理后台：管理声优、别名、图片与同步，含概览、声优管理、图片管理、别名管理、图片同步五个模块
+- 群消息直接匹配声优名/别名并返回随机图片
+- 支持 @机器人 命令：签到、声优列表
+- 提供管理后台（/admin）进行声优、别名和图片同步管理
 - 支持图片目录变更自动监听与数据库增量同步
-
-## 功能列表
-
-**QQ 群接入**
-
-- 群消息图片匹配：群内直接发送声优名/别名，返回随机图片；冷却机制默认开启（按用户维度）
-- 签到：`@机器人 签到` 每日随机抽取一位幸运女声优并附上图片，当天重复签到返回相同的幸运声优
-- 声优列表：`@机器人 声优列表` 返回当前可用声优与图片数量
-
-**Web 管理后台（五个模块）**
-
-- 概览：请求量、成功率、最近日志
-- 声优管理：新增 / 编辑 / 启用停用
-- 图片管理：图片查询、上传、删除
-- 别名管理：新增 / 删除
-- 图片同步：触发扫描并增量更新数据库
-
-**运维能力**
-
-- 文件系统监听（watchdog）：图片目录变更自动触发增量同步
 
 ## 技术栈
 
-- 后端：**Python 3.9+ / FastAPI / SQLAlchemy + PyMySQL / MySQL 8.0**
-- 前端：**Vue3 + TypeScript + Vite + Element Plus**（Vue Router / Axios）
-- 部署：**Docker Compose**
-
-> **QQ 接入层（单独说明）**：NoneBot2 + nonebot-adapter-onebot（OneBot v11 协议）作为机器人服务端，NapCat 作为 OneBot 协议服务（QQ 登录与消息收发），二者共同构成 QQ 群接入层。Web 管理后台与 QQ 接入共用同一 FastAPI 服务与 MySQL 数据库，不依赖 QQ 侧即可独立运行与开发。
+- Python 3.9+
+- NoneBot2 + nonebot-adapter-onebot
+- FastAPI（NoneBot 驱动层）
+- SQLAlchemy + PyMySQL
+- MySQL 8.0
+- NapCat（OneBot 协议服务）
+- Vue3 + TypeScript + Vite + Element Plus（管理后台前端）
+- Docker / Docker Compose
 
 ## 项目结构
 
@@ -43,27 +27,26 @@
 │       ├── main.py                 # 应用入口
 │       ├── config.py               # 配置读取（环境变量）
 │       ├── manage.py               # 管理命令（同步图片/目录等）
-│       ├── admin/                  # 管理后台（内置面板与 API 路由）
+│       ├── admin/                  # 管理后台与路由
 │       ├── monitor/                # 文件监听（watchdog）
 │       └── plugins/
 │           ├── mention_command/    # @机器人命令
 │           └── voice_actor/        # 声优核心逻辑（模型/服务/处理器）
-├── frontend/                       # 新 Vue3 管理后台前端（已开发完成，待上线）
+├── frontend/                       # 管理后台前端（Vue3 + TypeScript + Element Plus）
 │   ├── src/
 │   │   ├── api/                    # 接口封装（axios，/admin/api/*）
-│   │   ├── layouts/                # AdminLayout 管理后台布局
-│   │   ├── router/                 # 路由（hash 模式，五个模块）
+│   │   ├── layouts/                # 管理后台布局
+│   │   ├── router/                 # 路由（五个模块）
 │   │   └── views/                  # 概览/声优/图片/别名/同步五个页面
-│   ├── mock/                       # 开发期 mock 数据（vite-plugin-mock，仅 serve 生效）
-│   ├── vite.config.ts              # 含 /admin → 后端 8080 的开发代理配置
+│   ├── mock/                       # 开发期 mock 数据（无后端联调用）
+│   ├── vite.config.ts              # 含 /admin 开发代理配置
 │   └── package.json
 ├── database/
 │   ├── init.sql                    # 建表脚本
 │   └── seed.sql                    # 初始数据
 ├── docs/
 │   ├── API.md
-│   ├── DATABASE.md
-│   └── superpowers/plans/          # 开发计划文档
+│   └── DATABASE.md
 ├── images/                         # 声优图片目录（按声优名分文件夹）
 ├── logs/
 ├── docker-compose.yml
@@ -121,19 +104,6 @@ docker compose logs -f nonebot
 如部署在远程服务器，请将 localhost 替换为服务器地址。
 如果服务器没有放通8080端口，可使用本地ssh连接。
 
-## 前端开发（新管理后台）
-
-> **状态说明**：Vue3 前端（`frontend/`）已完成开发、五个页面通过 mock 数据联调，**尚未上线**；生产环境当前仍运行 FastAPI 服务内置的管理面板（http://localhost:8080/admin），切换上线为后续任务。
-
-### 启动
-
-```bash
-cd frontend
-pnpm install
-pnpm dev
-```
-
-
 ## 使用说明
 
 ### 群消息触发
@@ -148,13 +118,27 @@ pnpm dev
 
 ### 管理后台
 
-生产环境通过 /admin 访问内置面板（新 Vue3 前端开发完成、待切换上线），包含五个模块：
+管理后台前端位于 `frontend/`（Vue3 + TypeScript + Element Plus），本地开发：
 
-- 概览（请求量、成功率、最近日志）
-- 声优管理（新增/编辑/启用状态）
+```bash
+cd frontend
+pnpm install
+pnpm dev
+```
+
+开发时页面数据由 mock 提供；对接真实后端时，关闭 `vite.config.ts` 中的 mock 插件，开发代理会把 `/admin` 请求转发到 8080。
+
+生产环境访问 /admin 可进行：
+
+- 概览查看（请求量、成功率、最近日志）
+- 声优管理（新增/更新启用状态）
 - 图片管理（查询/上传/删除）
 - 别名管理（新增/删除）
 - 图片同步（触发扫描并更新数据库）
+
+### 前端部署（计划）
+
+前端后续以容器化方式上线：`pnpm build` 产出静态文件，由 nginx 容器托管，`/admin/api` 请求反向代理到 nonebot 服务，整合进现有 docker-compose 编排；切换上线前生产环境继续使用内置面板。
 
 <!-- ## 运维与管理命令
 
@@ -195,13 +179,12 @@ python3 scripts/manage_aliases.py remove 贵贵
 
 <!-- ## 开发说明
 
-当前项目以容器化运行路径为主。若进行本地开发，建议仍通过 Docker Compose 启动 MySQL 与 NapCat，再将代码目录挂载到 nonebot 容器中调试，避免本地路径与运行路径不一致带来的问题。 -->
+当前项目以容器化运行路径为主。若进行本地开发，建议仍通过 Docker Compose 启动 MySQL 与 NapCat，再将代码目录挂载到 nonebot 容器中调试，避免本地路径与运行路径不一致带来的问题。
 
 ## 文档导航
 
 - API 设计与扩展开发：docs/API.md
-- 数据库设计：docs/DATABASE.md
-- 前端重写开发计划：docs/superpowers/plans/2026-08-14-vue3-frontend-rewrite.md
+- 数据库设计：docs/DATABASE.md -->
 
 <!-- ## 许可证
 
