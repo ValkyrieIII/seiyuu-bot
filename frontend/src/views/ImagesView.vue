@@ -1,13 +1,15 @@
 <script setup lang="ts">
-// 图片管理页：上传（选声优 + 多文件）/ 列表（缩略图可放大 / 按声优筛选 + 文件名搜索防抖 / 分页）/ 启用开关 / 删除
+// 图片管理页：上传（选声优 + 多文件）/ 双视图（表格列表 | 按声优分类）/ 启用开关 / 删除
 // 行为对齐原面板 backend/bot/admin/static/admin.js 的 initImages / loadImages / bindImageActions：
 //   - 上传：el-select 选目标声优 + el-upload（http-request 自定义走 api.uploadImages，FormData files 字段），
-//     完成后按 results 统计成功/失败数，失败列出文件名
-//   - 列表：el-image 缩略图（imageFileUrl(id)）点击放大、文件名、所属声优、大小(KB)、
+//     完成后按 results 统计成功/失败数，失败列出文件名，并刷新当前视图
+//   - 表格视图：el-image 缩略图点击放大、文件名、所属声优、大小(KB)、
 //     启用开关（失败回滚）、删除（el-popconfirm 确认「同时删除文件，不可撤销」）
-//   - 筛选：按声优 el-select + 文件名搜索（防抖 300ms），任一变化回第 1 页
+//   - 分类视图：ImageGroupedView 子组件（按需展开 + 缓存，看哪个声优拉哪个），与表格共用筛选状态
+//   - 筛选：按声优 el-select + 文件名搜索（防抖 300ms），任一变化回第 1 页（表格视图）
 //   - 分页：服务端分页，page_size 固定 20（对齐原面板 imagePageSize）
 import { onActivated, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import ImageGroupedView from '../components/ImageGroupedView.vue'
 import { ElMessage } from 'element-plus'
 import type { UploadInstance, UploadRawFile, UploadRequestOptions } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
@@ -22,6 +24,18 @@ const items = ref<ImageItem[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = 20
+
+// ---------- 视图切换：表格列表 | 按声优分类（v-show 双挂载，keep-alive 下切换不丢状态） ----------
+
+const viewMode = ref<'table' | 'grouped'>('table')
+const groupedViewRef = ref<InstanceType<typeof ImageGroupedView>>()
+
+function switchView(mode: string | number | boolean | undefined) {
+  const m: 'table' | 'grouped' = mode === 'grouped' ? 'grouped' : 'table'
+  viewMode.value = m
+  // 切到分类视图时刷新一次（首次挂载由子组件自身加载；切回时保持最新）
+  if (m === 'grouped') groupedViewRef.value?.reload()
+}
 
 // ---------- 声优下拉（上传目标 / 筛选共用） ----------
 
@@ -111,7 +125,9 @@ function finishUpload() {
   const failText = b.fail.length > 0 ? `，失败 ${b.fail.length} 张 (${b.fail.join(', ')})` : ''
   if (b.fail.length > 0) ElMessage.warning(`上传完成: 成功 ${b.ok} 张${failText}`)
   else ElMessage.success(`上传完成: 成功 ${b.ok} 张`)
-  void loadImages()
+  // 刷新当前视图：表格直接重载；分类视图（已挂载时）调 reload
+  if (viewMode.value === 'table') void loadImages()
+  else groupedViewRef.value?.reload()
 }
 
 // ---------- 筛选 / 搜索 ----------
@@ -214,8 +230,11 @@ onMounted(() => {
 })
 
 // keep-alive 缓存下 onMounted 仅首次触发；切回本页时刷新声优下拉（新增声优后立即可选/可筛选）
+// 同时刷新当前视图数据，保证切回页面时看到最新内容
 onActivated(() => {
   void loadActors()
+  if (viewMode.value === 'table') void loadImages()
+  else groupedViewRef.value?.reload()
 })
 </script>
 
@@ -255,11 +274,14 @@ onActivated(() => {
       </div>
     </el-card>
 
-    <!-- 列表区 -->
+    <!-- 列表区：视图切换 + 公共筛选 -->
     <el-card shadow="never" class="list-card">
       <template #header>
         <div class="card-header">
-          <span class="card-title">图片列表（{{ total }}）</span>
+          <el-radio-group v-model="viewMode" size="small" @change="switchView">
+            <el-radio-button value="table">表格列表</el-radio-button>
+            <el-radio-button value="grouped">按声优分类</el-radio-button>
+          </el-radio-group>
           <div class="filters">
             <el-select
               v-model="filterActorId"
@@ -286,63 +308,75 @@ onActivated(() => {
           </div>
         </div>
       </template>
-      <el-table :data="items" :loading="loading" stripe>
-        <el-table-column label="预览" width="90">
-          <template #default="{ row }">
-            <el-image
-              class="thumb"
-              :src="imageFileUrl(row.id)"
-              :preview-src-list="[imageFileUrl(row.id)]"
-              preview-teleported
-              fit="cover"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column
-          prop="filename"
-          label="文件名"
-          min-width="220"
-          show-overflow-tooltip
-        />
-        <el-table-column prop="voice_actor_name" label="所属声优" width="150" />
-        <el-table-column label="大小(KB)" width="100">
-          <template #default="{ row }">{{ row.size_kb }}</template>
-        </el-table-column>
-        <el-table-column label="启用" width="90">
-          <template #default="{ row }">
-            <el-switch
-              v-model="row.is_active"
-              :loading="pendingToggle[row.id]"
-              @change="(val) => onToggleChange(row.id, val)"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="90">
-          <template #default="{ row }">
-            <el-popconfirm
-              :title="`确定删除图片「${row.filename}」吗？此操作会同时删除文件，不可撤销。`"
-              confirm-button-text="删除"
-              cancel-button-text="取消"
-              @confirm="onDelete(row as ImageItem)"
-            >
-              <template #reference>
-                <el-button type="danger" size="small" text>删除</el-button>
-              </template>
-            </el-popconfirm>
-          </template>
-        </el-table-column>
-      </el-table>
-      <!-- 单页（total <= page_size）不渲染分页，对齐原面板 totalPages > 1 才显示 -->
-      <div v-if="total > pageSize" class="pager">
-        <el-pagination
-          background
-          layout="total, prev, pager, next"
-          :total="total"
-          :current-page="page"
-          :page-size="pageSize"
-          @current-change="onPageChange"
-        />
+
+      <!-- 表格视图（服务端分页，原面板对齐行为） -->
+      <div v-show="viewMode === 'table'">
+        <el-table :data="items" :loading="loading" stripe>
+          <el-table-column label="预览" width="90">
+            <template #default="{ row }">
+              <el-image
+                class="thumb"
+                :src="imageFileUrl(row.id)"
+                :preview-src-list="[imageFileUrl(row.id)]"
+                preview-teleported
+                fit="cover"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column
+            prop="filename"
+            label="文件名"
+            min-width="220"
+            show-overflow-tooltip
+          />
+          <el-table-column prop="voice_actor_name" label="所属声优" width="150" />
+          <el-table-column label="大小(KB)" width="100">
+            <template #default="{ row }">{{ row.size_kb }}</template>
+          </el-table-column>
+          <el-table-column label="启用" width="90">
+            <template #default="{ row }">
+              <el-switch
+                v-model="row.is_active"
+                :loading="pendingToggle[row.id]"
+                @change="(val) => onToggleChange(row.id, val)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="90">
+            <template #default="{ row }">
+              <el-popconfirm
+                :title="`确定删除图片「${row.filename}」吗？此操作会同时删除文件，不可撤销。`"
+                confirm-button-text="删除"
+                cancel-button-text="取消"
+                @confirm="onDelete(row as ImageItem)"
+              >
+                <template #reference>
+                  <el-button type="danger" size="small" text>删除</el-button>
+                </template>
+              </el-popconfirm>
+            </template>
+          </el-table-column>
+        </el-table>
+        <!-- 单页（total <= page_size）不渲染分页，对齐原面板 totalPages > 1 才显示 -->
+        <div v-if="total > pageSize" class="pager">
+          <el-pagination
+            background
+            layout="total, prev, pager, next"
+            :total="total"
+            :current-page="page"
+            :page-size="pageSize"
+            @current-change="onPageChange"
+          />
+        </div>
       </div>
+
+      <!-- 分类视图：按声优分组，与表格共用筛选状态 -->
+      <ImageGroupedView
+        v-show="viewMode === 'grouped'"
+        ref="groupedViewRef"
+        :keyword="keyword"
+        :filter-actor-id="filterActorId"
+      />
     </el-card>
   </div>
 </template>

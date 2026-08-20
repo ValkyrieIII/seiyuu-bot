@@ -69,3 +69,6 @@ database/backups/
 # superpowers 工作目录（计划/审查稿，不提交）
 docs/superpowers/
 .superpowers/
+
+# pnpm store（docker 挂载构建产生的缓存）
+.pnpm-store/
