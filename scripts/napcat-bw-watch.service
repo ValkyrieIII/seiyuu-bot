@@ -1,0 +1,13 @@
+[Unit]
+Description=Auto-limit NapCat container bandwidth
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+ExecStart=/home/ubuntu/data/qqbot/scripts/napcat-bw-watch.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

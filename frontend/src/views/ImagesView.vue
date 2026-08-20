@@ -7,7 +7,7 @@
 //     启用开关（失败回滚）、删除（el-popconfirm 确认「同时删除文件，不可撤销」）
 //   - 筛选：按声优 el-select + 文件名搜索（防抖 300ms），任一变化回第 1 页
 //   - 分页：服务端分页，page_size 固定 20（对齐原面板 imagePageSize）
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { onActivated, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { UploadInstance, UploadRawFile, UploadRequestOptions } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
@@ -210,8 +210,12 @@ function onPageChange(p: number) {
 }
 
 onMounted(() => {
-  void loadActors()
   void loadImages()
+})
+
+// keep-alive 缓存下 onMounted 仅首次触发；切回本页时刷新声优下拉（新增声优后立即可选/可筛选）
+onActivated(() => {
+  void loadActors()
 })
 </script>
 

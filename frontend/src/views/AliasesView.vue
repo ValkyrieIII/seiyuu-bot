@@ -7,7 +7,7 @@
 //   - 删除经 el-popconfirm 确认，文案对齐原面板「确定删除别名「…」吗？此操作不可撤销。」；成功提示「别名已删除」
 //   - 409 重复别名等后端错误：client.ts 已透传 {detail}，直接展示 e.message
 //   - ID 点击复制（navigator.clipboard，非 secure context 下降级 textarea + execCommand）
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onActivated, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
@@ -158,8 +158,12 @@ async function loadVoiceActors() {
 }
 
 onMounted(() => {
-  void loadVoiceActors()
   void loadAliases()
+})
+
+// keep-alive 缓存下 onMounted 仅首次触发；切回本页时刷新声优下拉（新增声优后立即可选）
+onActivated(() => {
+  void loadVoiceActors()
 })
 </script>
 

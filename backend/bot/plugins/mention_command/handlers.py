@@ -72,12 +72,16 @@ async def handle_mention_command(event: MessageEvent, matcher: Matcher):
                         )
                         image_uri = f"file:///{file_url}"
                         reply = Message([
-                            MessageSegment.text(text),
+                            MessageSegment.at(event.user_id),
+                            MessageSegment.text(" " + text),
                             MessageSegment.image(image_uri),
                         ])
                         await matcher.finish(reply)
 
-            await matcher.finish(text)
+            await matcher.finish(Message([
+                MessageSegment.at(event.user_id),
+                MessageSegment.text(" " + text),
+            ]))
 
         except FinishedException:
             raise
