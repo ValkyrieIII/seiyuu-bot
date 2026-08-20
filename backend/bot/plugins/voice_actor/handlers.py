@@ -35,6 +35,15 @@ async def handle_voice_actor_message(event: GroupMessageEvent, matcher: Matcher)
         if not message_text:
             return
 
+        # 忽略 @ 了其他用户（含 @全体成员）的消息：
+        # get_plaintext() 会滤掉 at 段，导致 "@别人 声优名" 被解析成 "声优名" 而误触发
+        for seg in event.get_message():
+            if seg.type == "at" and seg.data.get("qq") != str(event.self_id):
+                logger.debug(
+                    f"消息 @ 了其他用户，忽略 - 用户: {event.user_id}, 内容: {message_text}"
+                )
+                return
+
         # 记录请求开始时间
         start_time = time.time()
         user_id = event.user_id
