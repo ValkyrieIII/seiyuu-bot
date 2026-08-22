@@ -1,5 +1,3 @@
-USE qqbot;
-
 -- 插入示例声优数据
 INSERT INTO voice_actors (name, description, image_count, is_active) VALUES
 ('中岛由贵', '日本著名声优，代表作《進撃の巨人》里欧-莱纳', 0, 1),

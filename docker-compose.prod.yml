@@ -1,0 +1,62 @@
+services:
+  mysql:
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+  nonebot:
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      NONEBOT_ADAPTER_ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:?ONEBOT_ACCESS_TOKEN is required in production}
+      ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:?ONEBOT_ACCESS_TOKEN is required in production}
+      BOT_QQ: ${BOT_QQ:?BOT_QQ is required in production}
+    volumes:
+      - ${IMAGES_PATH:-./images}:/app/images
+      - ${LOGS_PATH:-./logs}:/app/logs
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+  frontend:
+    ports:
+      - "${FRONTEND_BIND_IP:-127.0.0.1}:${FRONTEND_PORT:-80}:80"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+  napcat:
+    image: ${NAPCAT_IMAGE:?NAPCAT_IMAGE must be pinned in production}
+    ports:
+      - "${NAPCAT_BIND_IP:-127.0.0.1}:${NAPCAT_ADMIN_PORT:-3000}:3000"
+      - "${NAPCAT_BIND_IP:-127.0.0.1}:${NAPCAT_WEBUI_PORT:-6099}:6099"
+    volumes:
+      - napcat_data:/opt/napcat/data
+      - ${IMAGES_PATH:-./images}:/app/images
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+
+volumes:
+  napcat_data:

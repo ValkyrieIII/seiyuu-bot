@@ -19,8 +19,6 @@ dependencies = [
 [tool.nonebot]
 plugins = ["bot.plugins"]
 
-# OneBot v11 反向 WebSocket 服务器配置
-[tool.nonebot.ext.onebot_v11.ws_reverse_servers]
-host = "0.0.0.0"
-port = 8080
-access_token = "s~N9cCeg-SDmpwWM"
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

@@ -1,157 +1,98 @@
 services:
-  # MySQL 数据库服务
   mysql:
-    image: mysql:8.0
-    container_name: qqbot-mysql
+    image: ${MYSQL_IMAGE:-mysql:8.0}
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root123}
-      MYSQL_DATABASE: ${DB_NAME:-qqbot}
-      MYSQL_USER: ${DB_USER:-qqbot}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-qqbot123}
-      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD is required}
+      MYSQL_DATABASE: ${DB_NAME:?DB_NAME is required}
+      MYSQL_USER: ${DB_USER:?DB_USER is required}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      TZ: ${TZ:-Asia/Shanghai}
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-    ports:
-      - "127.0.0.1:3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ./database/seed.sql:/docker-entrypoint-initdb.d/seed.sql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
     networks:
       - qqbot_network
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
-      timeout: 20s
-      retries: 10
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
       interval: 10s
-    restart: unless-stopped
-
-  # Tailscale VPN sidecar — 将出口流量通过笔记本路由到中大校园网
-  # 启用方式: docker compose --profile tailscale up -d
-  tailscale:
-    image: tailscale/tailscale:latest
-    container_name: qqbot-tailscale
-    hostname: DESKTOP-SYSU01
-    profiles: ["tailscale"]
-    environment:
-      TS_AUTHKEY: ${TAILSCALE_AUTH_KEY}
-      TS_STATE_DIR: /var/lib/tailscale/state
-      TS_USERSPACE: "false"
-      TS_EXTRA_ARGS: >
-        --exit-node=${TAILSCALE_EXIT_NODE}
-        --exit-node-allow-lan-access=true
-        --accept-dns=false
-    volumes:
-      - tailscale_state:/var/lib/tailscale/state
-      - /dev/net/tun:/dev/net/tun
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-    ports:
-      - "${NONEBOT_PORT:-8080}:8080"   # nonebot 管理后台 + 反向WS
-      - "6099:6099"                      # napcat web UI
-    networks:
-      - qqbot_network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "tailscale", "status", "--active"]
-      interval: 15s
       timeout: 5s
-      retries: 3
-      start_period: 60s
+      retries: 10
+      start_period: 20s
 
-  # NoneBot 应用服务
   nonebot:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: qqbot-nonebot
-    user: "${UID:-1000}:${GID:-1000}"
+      target: runtime
     environment:
+      APP_ENV: ${APP_ENV:-development}
       DB_HOST: mysql
       DB_PORT: 3306
-      DB_NAME: ${DB_NAME:-qqbot}
-      DB_USER: ${DB_USER:-qqbot}
-      DB_PASSWORD: ${DB_PASSWORD:-qqbot123}
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       DRIVER: ${DRIVER:-~fastapi}
-      HOST: ${HOST:-0.0.0.0}
+      HOST: 0.0.0.0
+      PORT: 8080
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      NONEBOT_ADAPTER_ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:-s~N9cCeg-SDmpwWM}
+      LOG_FOLDER: /app/logs
+      IMAGE_FOLDER: /app/images
+      NONEBOT_ADAPTER_ONEBOT_WS_REVERSE_SERVERS: '["0.0.0.0:8080"]'
+      NONEBOT_ADAPTER_ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:-}
+      ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:-}
       NAPCAT_HOST: ${NAPCAT_HOST:-napcat}
       NAPCAT_PORT: ${NAPCAT_PORT:-3001}
-      NAPCAT_WS_PATH: /onebot/v11/ws
-      BOT_QQ: ${BOT_QQ:-123456789}
+      NAPCAT_WS_PATH: ${NAPCAT_WS_PATH:-/onebot/v11/ws}
+      BOT_QQ: ${BOT_QQ:-}
       GROUP_ID: ${GROUP_ID:-}
-      TZ: Asia/Shanghai
+      COOLDOWN_DURATION: ${COOLDOWN_DURATION:-1}
+      TZ: ${TZ:-Asia/Shanghai}
       LANG: C.UTF-8
       LC_ALL: C.UTF-8
       PYTHONIOENCODING: utf-8
-    ports:
-      - "${NONEBOT_PORT:-8080}:8080"
-    volumes:
-      - ./backend/bot:/app/bot
-      - ./images:/app/images
-      - ./config:/app/config
-      - ./logs:/app/logs
+      PYTHONDONTWRITEBYTECODE: "1"
+    expose:
+      - "8080"
     depends_on:
       mysql:
         condition: service_healthy
     networks:
       - qqbot_network
-    restart: unless-stopped
-    command: python -m bot.main
+    init: true
 
-  # 管理后台前端（Vue3 + Element Plus，nginx 托管静态产物并反代 /admin 到 nonebot）
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: qqbot-frontend
-    ports:
-      - "${FRONTEND_PORT:-5173}:80"
+      target: runtime
+    expose:
+      - "80"
     depends_on:
-      - nonebot
+      nonebot:
+        condition: service_healthy
     networks:
       - qqbot_network
-    restart: unless-stopped
 
-  # NapCat 协议服务
   napcat:
-    image: mlikiowa/napcat-docker:latest
-    container_name: qqbot-napcat
-    hostname: DESKTOP-SYSU
+    image: ${NAPCAT_IMAGE:-mlikiowa/napcat-docker:latest}
+    profiles: ["qq"]
     environment:
-      NAPCAT_UID: "${UID:-1000}"
-      NAPCAT_GID: "${GID:-1000}"
-      ACCOUNT: ${BOT_QQ}
-      NAPCAT_QUICK_PASSWORD: ${NAPCAT_QUICK_PASSWORD}
-      NAPCAT_ADMIN_ENDPOINT: "http://0.0.0.0:3000"
-      NAPCAT_WS_ENDPOINT: "ws://0.0.0.0:3001"
-      NAPCAT_ONEBOT_V11_REVERSE_WS: "ws://nonebot:8080/onebot/v11/ws"
-    ports:
-      - "6099:6099"
-    volumes:
-      - napcat_data:/opt/napcat/data
-      - ./images:/app/images
-      - napcat_plugins:/app/napcat/plugins
-      - napcat_qq_config:/app/.config/QQ
-      - napcat_config:/app/napcat/config
+      NAPCAT_ADMIN_ENDPOINT: http://0.0.0.0:3000
+      NAPCAT_WS_ENDPOINT: ws://0.0.0.0:3001
+      NAPCAT_ONEBOT_V11_REVERSE_WS: ws://nonebot:8080/onebot/v11/ws
+    expose:
+      - "3000"
+      - "3001"
+      - "6099"
+    depends_on:
+      nonebot:
+        condition: service_healthy
     networks:
       - qqbot_network
-    restart: unless-stopped
 
 volumes:
   mysql_data:
-    driver: local
-  napcat_data:
-    driver: local
-  napcat_plugins:
-    driver: local
-  napcat_qq_config:
-    driver: local
-  napcat_config:
-    driver: local
-  tailscale_state:
-    driver: local
 
 networks:
   qqbot_network:

@@ -1,0 +1,50 @@
+services:
+  mysql:
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - ./database/seed.dev.sql:/docker-entrypoint-initdb.d/20-seed-dev.sql:ro
+    restart: unless-stopped
+
+  nonebot:
+    build:
+      target: dev
+    environment:
+      APP_ENV: development
+      LOG_LEVEL: ${LOG_LEVEL:-DEBUG}
+    ports:
+      - "127.0.0.1:${NONEBOT_PORT:-8080}:8080"
+    volumes:
+      - ./backend/bot:/app/bot
+      - ./config:/app/config
+      - ./images:/app/images
+      - ./logs:/app/logs
+    command: ["watchfiles", "--filter", "python", "python -m bot.main", "/app/bot"]
+    restart: unless-stopped
+
+  frontend:
+    build:
+      target: dev
+    environment:
+      VITE_USE_MOCK: ${VITE_USE_MOCK:-false}
+      VITE_BACKEND_TARGET: http://nonebot:8080
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    restart: unless-stopped
+
+  napcat:
+    ports:
+      - "127.0.0.1:${NAPCAT_ADMIN_PORT:-3000}:3000"
+      - "127.0.0.1:${NAPCAT_WS_PORT:-3001}:3001"
+      - "127.0.0.1:${NAPCAT_WEBUI_PORT:-6099}:6099"
+    volumes:
+      - napcat_data:/opt/napcat/data
+      - ./images:/app/images
+    restart: unless-stopped
+
+volumes:
+  frontend_node_modules:
+  napcat_data:

@@ -1,57 +1,86 @@
-"""
-NoneBot 应用配置文件
-"""
+"""Application settings shared by development, test, and production."""
 
-import os
+from typing import Literal
+
+from pydantic import ConfigDict, model_validator
 from pydantic_settings import BaseSettings
-from pydantic import Field, ConfigDict
 
 
 class Settings(BaseSettings):
-    """应用主配置"""
+    """Load runtime settings from environment variables and an optional .env file."""
 
-    # 数据库配置
-    db_host: str = Field(default="localhost", env="DB_HOST")
-    db_port: int = Field(default=3306, env="DB_PORT")
-    db_name: str = Field(default="qqbot", env="DB_NAME")
-    db_user: str = Field(default="qqbot", env="DB_USER")
-    db_password: str = Field(default="qqbot123", env="DB_PASSWORD")
+    app_env: Literal["development", "test", "production"] = "development"
 
-    # NapCat 配置
-    napcat_host: str = Field(default="localhost", env="NAPCAT_HOST")
-    napcat_port: int = Field(default=3001, env="NAPCAT_PORT")
-    napcat_ws_path: str = Field(default="/onebot/v11/ws", env="NAPCAT_WS_PATH")
+    db_host: str = "localhost"
+    db_port: int = 3306
+    db_name: str = "qqbot"
+    db_user: str = "qqbot"
+    db_password: str = ""
 
-    # 日志配置
-    log_level: str = Field(default="INFO", env="LOG_LEVEL")
+    napcat_host: str = "localhost"
+    napcat_port: int = 3001
+    napcat_ws_path: str = "/onebot/v11/ws"
 
-    # 应用配置
-    cooldown_duration: int = Field(default=1, env="COOLDOWN_DURATION")
-    image_folder: str = Field(default="/app/images", env="IMAGE_FOLDER")
-    bot_qq: str = Field(default="", env="BOT_QQ")
-    group_id: str = Field(default="", env="GROUP_ID")
+    log_level: str = "INFO"
+    log_folder: str = "logs"
 
-    # OneBot v11 Token 配置（反向 WebSocket 连接需要）
-    onebot_access_token: str = Field(
-        default="s~N9cCeg-SDmpwWM", env="ONEBOT_ACCESS_TOKEN"
-    )
+    cooldown_duration: int = 1
+    image_folder: str = "images"
+    bot_qq: str = ""
+    group_id: str = ""
+    onebot_access_token: str = ""
 
     model_config = ConfigDict(
         env_file=".env",
         case_sensitive=False,
-        extra="ignore",  # 忽略 .env 中未定义的字段
+        extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self):
+        """Fail fast when production is started with missing or sample credentials."""
+        if self.app_env != "production":
+            return self
+
+        insecure_db_passwords = {
+            "",
+            "change_me",
+            "qqbot123",
+            "dev-app-password",
+            "test-app-password",
+        }
+        insecure_tokens = {
+            "",
+            "change_me",
+            "dev-only-onebot-token",
+            "test-only-onebot-token",
+        }
+        errors = []
+
+        if self.db_password.strip().lower() in insecure_db_passwords:
+            errors.append("DB_PASSWORD must be set to a production secret")
+        if self.onebot_access_token.strip().lower() in insecure_tokens:
+            errors.append("ONEBOT_ACCESS_TOKEN must be set to a production secret")
+        if self.bot_qq.strip().lower() in {"", "change_me"}:
+            errors.append("BOT_QQ must be set in production")
+
+        if errors:
+            raise ValueError("; ".join(errors))
+
+        return self
 
     @property
     def db_url(self) -> str:
-        """生成数据库连接字符串"""
-        return f"mysql+pymysql://{self.db_user}:{self.db_password}@{self.db_host}:{self.db_port}/{self.db_name}?charset=utf8mb4"
+        """Build the SQLAlchemy MySQL connection URL."""
+        return (
+            f"mysql+pymysql://{self.db_user}:{self.db_password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}?charset=utf8mb4"
+        )
 
     @property
     def napcat_ws_url(self) -> str:
-        """生成 NapCat WebSocket 连接地址"""
+        """Build the internal NapCat WebSocket URL."""
         return f"ws://{self.napcat_host}:{self.napcat_port}{self.napcat_ws_path}"
 
 
-# 全局配置实例
 settings = Settings()

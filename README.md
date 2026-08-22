@@ -54,55 +54,29 @@
 └── requirements.txt
 ```
 
-## 快速开始（Docker Compose，推荐）
+## 环境与快速开始
 
-### 1) 前置准备
+项目使用基础 Compose 文件叠加环境覆盖文件，提供彼此隔离的 Dev / Test / Prod 三套环境：
 
-- 已安装 Docker 与 Docker Compose
-- 服务器或本机可访问端口：8080（NoneBot）、6099（NapCat WebUI）、3307（MySQL 映射）
-- 具备可用 QQ 账号用于 NapCat 登录
+- Dev：源码挂载与热重载，可选启用 NapCat。
+- Test：独立 MySQL 数据卷和测试夹具，默认完全不启动 NapCat。
+- Prod：只读应用文件系统、日志轮转，MySQL 与 NoneBot 不直接暴露宿主机端口。
 
-### 2) 配置环境变量
+本地开发：
 
-在项目根目录创建.env 文件，按实际环境修改关键项：
-
-- SERVER_IP：NapCat 回连 NoneBot 的主机地址（非常关键）
-- ONEBOT_ACCESS_TOKEN：OneBot 访问令牌（需与 NapCat 侧保持一致）
-- DB_ROOT_PASSWORD / DB_NAME / DB_USER / DB_PASSWORD：数据库配置
-- BOT_QQ：机器人 QQ 号
-- GROUP_ID：可选，限制群使用
-- UID / GID：可选，建议设置为宿主机运行用户的 uid/gid（用于避免容器写入后文件变成 root 属主）
-
-建议在生产环境至少修改：
-
-- ONEBOT_ACCESS_TOKEN
-- DB_ROOT_PASSWORD
-- DB_PASSWORD
-
-
-### 3) 挂载图片文件夹
-在根目录/images下创建声优文件夹，格式为images/声优名。
-在相应声优文件夹下放置图片。
-
-### 4) 启动服务
-
-```bash
-docker compose up -d --build
+```powershell
+Copy-Item .env.dev.example .env.dev
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ```
 
-### 5) 检查状态
+自动化测试：
 
-```bash
-docker compose ps
-docker compose logs -f nonebot
+```powershell
+Copy-Item .env.test.example .env.test
+docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from test test
 ```
 
-看到 NoneBot 正常启动且无持续报错后，可访问管理后台：
-
-- http://localhost:8080/admin
-
-如部署在远程服务器，请将 localhost 替换为服务器地址。
-如果服务器没有放通8080端口，可使用本地ssh连接。
+生产部署前复制 `.env.prod.example` 为 `.env.prod`，填写全部留空密钥并固定 NapCat 镜像版本。所有命令、端口和迁移说明见 [Dev / Test / Prod 环境文档](docs/ENVIRONMENTS.md)。
 
 ## 使用说明
 
@@ -126,7 +100,7 @@ pnpm install
 pnpm dev
 ```
 
-开发时页面数据由 mock 提供；对接真实后端时，关闭 `vite.config.ts` 中的 mock 插件，开发代理会把 `/admin` 请求转发到 8080。
+开发环境默认连接真实后端；将 `.env.dev` 中的 `VITE_USE_MOCK` 改为 `true` 可切换到 mock 数据。开发代理会把 `/admin` 请求转发到 NoneBot。
 
 生产环境访问 /admin 可进行：
 
@@ -136,9 +110,9 @@ pnpm dev
 - 别名管理（新增/删除）
 - 图片同步（触发扫描并更新数据库）
 
-### 前端部署（计划）
+### 前端部署
 
-前端后续以容器化方式上线：`pnpm build` 产出静态文件，由 nginx 容器托管，`/admin/api` 请求反向代理到 nonebot 服务，整合进现有 docker-compose 编排；切换上线前生产环境继续使用内置面板。
+生产镜像会执行 `pnpm build`，由 Nginx 托管静态文件，并将 `/admin`、`/health` 与可选的 OneBot WebSocket 转发到 NoneBot。
 
 <!-- ## 运维与管理命令
 

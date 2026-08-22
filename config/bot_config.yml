@@ -1,0 +1,26 @@
+# NoneBot 应用配置文件
+
+# 驱动器配置
+driver=~aiohttp
+
+# 通信协议头
+api_root=
+
+# 监听主机和端口
+host=0.0.0.0
+port=8080
+
+# 数据库连接（从环境变量读取）
+# DB_HOST、DB_PORT、DB_NAME、DB_USER、DB_PASSWORD
+
+# 日志配置
+log_level=INFO
+
+# 插件加载
+plugins=["voice_actor"]
+
+# 命令前缀
+command_start=["", "/"]
+
+# 超级用户（管理员QQ号，多个用逗号分隔）
+superusers=[]

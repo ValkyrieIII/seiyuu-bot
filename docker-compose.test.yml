@@ -1,0 +1,45 @@
+services:
+  mysql:
+    volumes:
+      - ./database/seed.test.sql:/docker-entrypoint-initdb.d/20-seed-test.sql:ro
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: test
+    environment:
+      APP_ENV: test
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:?DB_NAME is required}
+      DB_USER: ${DB_USER:?DB_USER is required}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:-test-only-token}
+      IMAGE_FOLDER: /app/tests/fixtures/images
+      LOG_FOLDER: /tmp/qqbot-test-logs
+      LOG_LEVEL: WARNING
+      PYTHONIOENCODING: utf-8
+      PYTHONDONTWRITEBYTECODE: "1"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - qqbot_network
+    command: ["python", "-m", "pytest", "-q", "tests"]
+
+  frontend-test:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: test
+    profiles: ["frontend"]
+
+  nonebot:
+    profiles: ["app"]
+
+  frontend:
+    profiles: ["app"]
+
+  napcat:
+    profiles: ["qq"]

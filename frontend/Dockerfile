@@ -1,20 +1,33 @@
-# ---- 构建阶段：pnpm 安装依赖并产出静态产物 ----
-FROM node:22-alpine AS build
+ARG NODE_IMAGE=node:22-alpine
+ARG NGINX_IMAGE=nginx:1.27-alpine
+FROM ${NODE_IMAGE} AS deps
+
 WORKDIR /app
-
-# 启用 corepack 并使用与 lockfile(9.0) 兼容的 pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
-
-# 先拷贝依赖清单，利用 Docker 层缓存
+ARG PNPM_VERSION=10.15.0
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
-# 拷贝源码并构建（vue-tsc 类型检查 + vite build）
+FROM deps AS dev
+
+COPY . .
+EXPOSE 5173
+CMD ["pnpm", "dev", "--host", "0.0.0.0"]
+
+FROM deps AS test
+
+COPY . .
+CMD ["pnpm", "build"]
+
+FROM deps AS build
+
 COPY . .
 RUN pnpm build
 
-# ---- 运行阶段：nginx 托管静态产物，/admin 反代到后端 ----
-FROM nginx:alpine
+FROM ${NGINX_IMAGE} AS runtime
+
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget -qO- http://127.0.0.1/ >/dev/null || exit 1

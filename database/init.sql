@@ -1,5 +1,3 @@
-USE qqbot;
-
 -- 声优表
 CREATE TABLE IF NOT EXISTS voice_actors (
     id INT PRIMARY KEY AUTO_INCREMENT COMMENT '声优ID',
@@ -83,6 +81,19 @@ CREATE TABLE IF NOT EXISTS request_logs (
     INDEX idx_command (command),
     INDEX idx_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='请求日志表';
+
+-- 每日签到表
+CREATE TABLE IF NOT EXISTS check_ins (
+    id INT PRIMARY KEY AUTO_INCREMENT COMMENT '签到ID',
+    user_id BIGINT NOT NULL COMMENT '用户QQ号',
+    group_id BIGINT COMMENT '群组ID',
+    check_in_date DATE NOT NULL COMMENT '签到日期',
+    lucky_actor_id INT COMMENT '当日幸运声优ID',
+    lucky_image_id INT COMMENT '当日幸运图片ID',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    UNIQUE KEY unique_user_date (user_id, check_in_date),
+    INDEX idx_check_in_date (check_in_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='每日签到记录表';
 
 -- 创建视图：统计每个声优的图片数量
 CREATE OR REPLACE VIEW v_voice_actor_stats AS
