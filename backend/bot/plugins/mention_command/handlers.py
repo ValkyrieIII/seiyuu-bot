@@ -5,6 +5,7 @@
 import os
 import random
 import time
+from pathlib import Path
 
 from loguru import logger
 from nonebot import on_message
@@ -12,6 +13,7 @@ from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment, Message
 from nonebot.matcher import Matcher
 from nonebot.rule import to_me
 
+from bot.config import settings
 from bot.plugins.mention_command.services import CheckInService
 from bot.observability import elapsed_ms, record_event
 
@@ -67,12 +69,10 @@ async def handle_mention_command(event: MessageEvent, matcher: Matcher):
                         else None
                     )
                     if image and os.path.exists(image.file_path):
-                        file_url = (
-                            image.file_path.lstrip("/")
-                            if image.file_path.startswith("/")
-                            else image.file_path
-                        )
-                        image_uri = f"file:///{file_url}"
+                        image_path = Path(image.file_path)
+                        if not image_path.is_absolute():
+                            image_path = Path(settings.image_folder) / image.filename
+                        image_uri = f"file://{image_path}"
                         reply = Message([
                             MessageSegment.at(event.user_id),
                             MessageSegment.text(" " + text),

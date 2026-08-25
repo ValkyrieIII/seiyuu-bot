@@ -3,11 +3,13 @@
 """
 
 import os
+from pathlib import Path
 import time
 from loguru import logger
 from nonebot import on_message
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, MessageSegment, Message
 from nonebot.matcher import Matcher
+from bot.config import settings
 from .services import AliasService, CooldownService, ImageService
 from bot.observability import (
     elapsed_ms,
@@ -119,15 +121,13 @@ async def handle_voice_actor_message(event: GroupMessageEvent, matcher: Matcher)
             return
 
         # 构建消息
-        # 移除文件路径开头的 / 以避免 file:/// 变成 file:////
-        file_url = (
-            image.file_path.lstrip("/")
-            if image.file_path.startswith("/")
-            else image.file_path
-        )
-        image_uri = f"file:///{file_url}"
+        # 兼容 DB 中相对(images/...)与绝对(/app/images/...)两种存储格式
+        image_path = Path(image.file_path)
+        if not image_path.is_absolute():
+            image_path = Path(settings.image_folder) / image.filename
+        image_uri = f"file://{image_path}"
         logger.debug(f"原始路径: {image.file_path}")
-        logger.debug(f"处理后路径: {file_url}")
+        logger.debug(f"处理后路径: {image_path}")
         logger.debug(f"最终 URI: {image_uri}")
         msg_segments = [
             # MessageSegment.text(f"给你 {voice_actor.name} 的图片~\n"),
