@@ -79,6 +79,7 @@ from nonebot.adapters.onebot.v11 import Adapter
 
 from bot.admin import register_admin_routes
 from bot.health import register_health_route
+from bot.observability import register_observability_hooks
 
 
 def main():
@@ -91,6 +92,7 @@ def main():
         driver = nonebot.get_driver()
 
         register_health_route(driver)
+        register_observability_hooks(driver)
         driver.register_adapter(Adapter)
 
         nonebot.load_plugins("bot/plugins")

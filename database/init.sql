@@ -67,19 +67,22 @@ CREATE TABLE IF NOT EXISTS user_cooldowns (
 -- 请求日志表（可选，用于数据分析）
 CREATE TABLE IF NOT EXISTS request_logs (
     id INT PRIMARY KEY AUTO_INCREMENT COMMENT '日志ID',
-    user_id INT NOT NULL COMMENT '用户ID',
-    group_id INT COMMENT '群组ID',
+    user_id BIGINT NOT NULL COMMENT '用户ID',
+    group_id BIGINT COMMENT '群组ID',
     command VARCHAR(64) NOT NULL COMMENT '命令',
     voice_actor_id INT COMMENT '请求的声优ID',
     image_id INT COMMENT '返回的图片ID',
     status VARCHAR(32) NOT NULL DEFAULT 'success' COMMENT '状态（success/cooldown/notfound/error）',
     response_time_ms INT COMMENT '响应时间（毫秒）',
     error_message TEXT COMMENT '错误信息',
+    error_code VARCHAR(64) COMMENT '稳定错误码',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '请求时间',
     INDEX idx_user_id (user_id),
     INDEX idx_group_id (group_id),
     INDEX idx_command (command),
-    INDEX idx_created_at (created_at)
+    INDEX idx_created_at (created_at),
+    INDEX idx_request_logs_created_status (created_at, status),
+    INDEX idx_request_logs_created_command (created_at, command)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='请求日志表';
 
 -- 每日签到表

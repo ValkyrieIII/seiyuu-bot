@@ -9,9 +9,11 @@ import type {
   ImageQuery,
   ImageUploadResult,
   OverviewData,
+  MetricsData,
   Paginated,
   SyncResult,
   SystemInfo,
+  ReadinessData,
   VoiceActor,
   VoiceActorPatch,
 } from './types'
@@ -94,6 +96,16 @@ const api = {
   /** bot 进程 CPU/内存占用与系统信息 */
   systemInfo(): Promise<SystemInfo> {
     return request({ url: '/system-info', method: 'get' })
+  },
+
+  /** 24h / 7d / 30d 聚合指标、队列和系统资源。 */
+  metrics(range: '24h' | '7d' | '30d'): Promise<MetricsData> {
+    return request({ url: '/metrics', method: 'get', params: { range } })
+  },
+
+  /** 数据库与 OneBot 分层就绪状态。 */
+  readiness(): Promise<ReadinessData> {
+    return request({ url: '/readiness', method: 'get' })
   },
 }
 

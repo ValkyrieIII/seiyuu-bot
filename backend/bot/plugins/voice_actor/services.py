@@ -333,24 +333,26 @@ class RequestLogService:
         image_id: int = None,
         response_time_ms: int = None,
         error_message: str = None,
+        error_code: str = None,
     ):
-        """记录请求"""
-        session = get_session()
+        """Compatibility facade that delegates to the non-blocking recorder.
+
+        ``error_message`` is intentionally ignored so user content cannot enter
+        new rows through legacy call sites.
+        """
         try:
-            log = RequestLog(
+            from bot.observability import record_event
+
+            return record_event(
                 user_id=user_id,
                 group_id=group_id,
                 command=command,
                 status=status,
                 voice_actor_id=voice_actor_id,
                 image_id=image_id,
-                response_time_ms=response_time_ms,
-                error_message=error_message,
+                duration_ms=response_time_ms,
+                error_code=error_code,
             )
-            session.add(log)
-            session.commit()
         except Exception as e:
             logger.error(f"记录请求失败: {e}")
-            session.rollback()
-        finally:
-            session.close()
+            return False

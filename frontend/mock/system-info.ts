@@ -13,7 +13,13 @@ export default [
         cpu_percent: 23.5,
         memory_mb: 412.6,
         memory_total_mb: 8192,
+        memory_percent: 5.0,
+        disk_used_gb: 26.1,
+        disk_total_gb: 80,
+        disk_percent: 32.6,
+        uptime_seconds: 912345,
         cpu_model: 'Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz',
+        sampled_at: Date.now() / 1000,
       }),
   },
 ] satisfies MockMethod[]

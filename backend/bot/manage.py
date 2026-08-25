@@ -25,13 +25,6 @@ from pathlib import Path
 sys.path.insert(0, "/app")
 
 from bot.config import settings
-from bot.plugins.voice_actor.models import VoiceActor, get_session
-from bot.plugins.voice_actor.utils import (
-    ensure_voice_actor_folders,
-    initialize_image_records,
-    scan_image_records,
-)
-from bot.plugins.mention_command.services import CheckInService
 from loguru import logger
 
 
@@ -52,6 +45,9 @@ def reinit_folders():
     print("=" * 60)
 
     try:
+        from bot.plugins.voice_actor.models import VoiceActor, get_session
+        from bot.plugins.voice_actor.utils import ensure_voice_actor_folders
+
         session = get_session()
         try:
             voice_actors = session.query(VoiceActor).all()
@@ -86,6 +82,8 @@ def list_folders():
     print("=" * 60)
 
     try:
+        from bot.plugins.voice_actor.models import VoiceActor, get_session
+
         session = get_session()
         try:
             voice_actors = session.query(VoiceActor).all()
@@ -128,6 +126,7 @@ def show_help():
     print("  scan-images-db              扫描文件系统并自动重命名后同步数据库（软删除）")
     print("  sync-database               等同 scan-images-db（兼容旧命令）")
     print("  reset-checkins              清空签到表所有记录")
+    print("  migrate-observability       显式迁移统计表（执行前必须备份数据库）")
     print("  help                        显示此帮助信息")
     print()
 
@@ -153,6 +152,8 @@ def main():
         show_help()
 
     elif command == "init-images-db":
+        from bot.plugins.voice_actor.utils import initialize_image_records
+
         print("=" * 60)
         print("初始化图片命名并重建数据库记录")
         print("=" * 60)
@@ -170,6 +171,8 @@ def main():
         sys.exit(0)
 
     elif command == "reset-checkins":
+        from bot.plugins.mention_command.services import CheckInService
+
         print("=" * 60)
         print("清空签到表")
         print("=" * 60)
@@ -182,6 +185,8 @@ def main():
             sys.exit(1)
 
     elif command == "scan-images-db" or command == "sync-database":
+        from bot.plugins.voice_actor.utils import scan_image_records
+
         print("=" * 60)
         print("扫描文件系统（含自动重命名）并同步数据库")
         print("=" * 60)
@@ -205,6 +210,33 @@ def main():
         if disabled_images > 0:
             print(f"✗ 禁用图片: {disabled_images}")
         print("=" * 60)
+        sys.exit(0)
+
+    elif command == "migrate-observability":
+        print("=" * 60)
+        print("可观测性数据库迁移")
+        print("=" * 60)
+        print("⚠️  请先对生产数据库执行并验证备份。")
+        assume_yes = "--yes" in sys.argv[2:]
+        if not assume_yes:
+            confirmed = input("确认已完成备份并继续？[y/N]: ").strip().lower()
+            if confirmed not in {"y", "yes"}:
+                print("已取消，数据库未修改。")
+                sys.exit(1)
+        from bot.observability.migration import migrate_observability
+
+        try:
+            actions = migrate_observability()
+        except Exception as exc:
+            logger.error("可观测性迁移失败: {}", exc)
+            print(f"❌ 迁移失败: {exc}")
+            sys.exit(1)
+        if actions:
+            print("✅ 迁移完成：")
+            for action in actions:
+                print(f"  - {action}")
+        else:
+            print("✅ 数据库已是目标结构，无需修改。")
         sys.exit(0)
 
     elif command == "rename-images-all":

@@ -2,6 +2,7 @@
 """管理后台路由：挂载到 NoneBot 的 FastAPI 应用。"""
 
 import hashlib
+import asyncio
 import os
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -72,10 +73,7 @@ def register_admin_routes(driver) -> None:
             since = datetime.utcnow() - timedelta(hours=24)
             request_24h = (
                 session.query(func.count(RequestLog.id))
-                .filter(
-                    RequestLog.created_at >= since,
-                    RequestLog.status != "notfound",
-                )
+                .filter(RequestLog.created_at >= since)
                 .scalar()
                 or 0
             )
@@ -92,7 +90,6 @@ def register_admin_routes(driver) -> None:
 
             recent_logs = (
                 session.query(RequestLog)
-                .filter(RequestLog.status != "notfound")
                 .order_by(RequestLog.created_at.desc())
                 .limit(20)
                 .all()
@@ -106,7 +103,7 @@ def register_admin_routes(driver) -> None:
                     "command": log.command,
                     "status": log.status,
                     "response_time_ms": log.response_time_ms,
-                    "error_message": log.error_message,
+                    "error_code": log.error_code,
                     "created_at": log.created_at.isoformat() if log.created_at else None,
                 }
                 for log in recent_logs
@@ -548,31 +545,29 @@ def register_admin_routes(driver) -> None:
 
     @router.get("/api/system-info")
     async def system_info():
-        """返回 bot 进程的 CPU/内存占用和系统信息。"""
-        import psutil
+        """返回缓存采样；不在异步请求中执行阻塞式 CPU 采样。"""
+        from bot.observability.system import get_system_sampler
 
-        proc = psutil.Process()
-        cpu_percent = proc.cpu_percent(interval=0.1)
-        mem = proc.memory_info()
-        mem_total = psutil.virtual_memory().total
-        cpu_model = ""
-        try:
-            with open("/proc/cpuinfo") as f:
-                for line in f:
-                    if line.startswith("model name"):
-                        cpu_model = line.split(":", 1)[1].strip()
-                        break
-        except Exception:
-            cpu_model = "Unknown"
+        return ok(await asyncio.to_thread(get_system_sampler().get))
 
-        return ok(
-            {
-                "cpu_percent": round(cpu_percent, 1),
-                "memory_mb": round(mem.rss / 1024 / 1024, 1),
-                "memory_total_mb": round(mem_total / 1024 / 1024, 1),
-                "cpu_model": cpu_model,
-            }
-        )
+    @router.get("/api/metrics")
+    async def metrics(
+        range_key: str = Query(default="24h", alias="range", pattern="^(24h|7d|30d)$")
+    ):
+        from bot.observability.queries import query_metrics
+        from bot.observability.recorder import get_recorder
+        from bot.observability.system import get_system_sampler
+
+        data = await asyncio.to_thread(query_metrics, range_key)
+        data["queue"] = get_recorder().stats()
+        data["system"] = await asyncio.to_thread(get_system_sampler().get)
+        return ok(data)
+
+    @router.get("/api/readiness")
+    async def readiness_status():
+        from bot.observability.system import readiness
+
+        return ok(await readiness())
 
     app.include_router(router)
 

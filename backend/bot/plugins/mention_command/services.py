@@ -67,7 +67,7 @@ class CheckInService:
         except Exception as e:
             logger.error(f"签到失败: {e}", exc_info=True)
             session.rollback()
-            return False, 0, None, None
+            raise
         finally:
             session.close()
 

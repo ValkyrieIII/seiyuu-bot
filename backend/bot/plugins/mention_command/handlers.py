@@ -4,15 +4,16 @@
 
 import os
 import random
+import time
 
 from loguru import logger
 from nonebot import on_message
 from nonebot.adapters.onebot.v11 import MessageEvent, MessageSegment, Message
 from nonebot.matcher import Matcher
 from nonebot.rule import to_me
-from nonebot.exception import FinishedException
 
 from bot.plugins.mention_command.services import CheckInService
+from bot.observability import elapsed_ms, record_event
 
 # 仅处理 @bot 消息；优先于 voice_actor 插件（voice_actor 为 priority=50）
 mention_command_matcher = on_message(rule=to_me(), priority=20, block=False)
@@ -21,6 +22,7 @@ mention_command_matcher = on_message(rule=to_me(), priority=20, block=False)
 @mention_command_matcher.handle()
 async def handle_mention_command(event: MessageEvent, matcher: Matcher):
     """处理 @bot 命令"""
+    start_ns = time.perf_counter_ns()
     # 延迟导入，避免在 voice_actor 插件加载前触发import导致注册失败
     from bot.plugins.voice_actor.services import VoiceActorService, ImageService
 
@@ -76,19 +78,45 @@ async def handle_mention_command(event: MessageEvent, matcher: Matcher):
                             MessageSegment.text(" " + text),
                             MessageSegment.image(image_uri),
                         ])
-                        await matcher.finish(reply)
+                        await matcher.send(reply)
+                        record_event(
+                            user_id=event.user_id,
+                            group_id=group_id,
+                            command="check_in",
+                            status="success",
+                            voice_actor_id=lucky_actor_id,
+                            image_id=lucky_image_id,
+                            duration_ms=elapsed_ms(start_ns),
+                        )
+                        return
 
-            await matcher.finish(Message([
+            await matcher.send(Message([
                 MessageSegment.at(event.user_id),
                 MessageSegment.text(" " + text),
             ]))
-
-        except FinishedException:
-            raise
+            record_event(
+                user_id=event.user_id,
+                group_id=group_id,
+                command="check_in",
+                status="success",
+                voice_actor_id=lucky_actor_id,
+                image_id=lucky_image_id,
+                duration_ms=elapsed_ms(start_ns),
+            )
+            return
 
         except Exception as e:
             logger.error(f"签到失败: {e}", exc_info=True)
-            await matcher.finish("签到失败，请稍后重试")
+            await matcher.send("签到失败，请稍后重试")
+            record_event(
+                user_id=event.user_id,
+                group_id=group_id,
+                command="check_in",
+                status="error",
+                duration_ms=elapsed_ms(start_ns),
+                error_code="CHECK_IN_FAILED",
+            )
+            return
 
     # 声优列表命令
     if message_text == "声优列表":
@@ -96,7 +124,15 @@ async def handle_mention_command(event: MessageEvent, matcher: Matcher):
             actors = VoiceActorService.get_all_voice_actors()
 
             if not actors:
-                await matcher.finish("当前没有可用的活跃声优")
+                await matcher.send("当前没有可用的活跃声优")
+                record_event(
+                    user_id=event.user_id,
+                    group_id=group_id,
+                    command="voice_actor_list",
+                    status="notfound",
+                    duration_ms=elapsed_ms(start_ns),
+                    error_code="NO_ACTIVE_VOICE_ACTORS",
+                )
                 return
 
             actors = sorted(actors, key=lambda x: x.name)
@@ -108,11 +144,25 @@ async def handle_mention_command(event: MessageEvent, matcher: Matcher):
                 event.user_id,
                 len(actors),
             )
-            await matcher.finish(reply)
-
-        except FinishedException:
-            raise
+            await matcher.send(reply)
+            record_event(
+                user_id=event.user_id,
+                group_id=group_id,
+                command="voice_actor_list",
+                status="success",
+                duration_ms=elapsed_ms(start_ns),
+            )
+            return
 
         except Exception as e:
             logger.error(f"处理 @bot 命令失败: {e}", exc_info=True)
-            await matcher.finish("获取声优列表失败，请稍后重试")
+            await matcher.send("获取声优列表失败，请稍后重试")
+            record_event(
+                user_id=event.user_id,
+                group_id=group_id,
+                command="voice_actor_list",
+                status="error",
+                duration_ms=elapsed_ms(start_ns),
+                error_code="VOICE_ACTOR_LIST_FAILED",
+            )
+            return

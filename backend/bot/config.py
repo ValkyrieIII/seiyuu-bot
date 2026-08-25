@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     group_id: str = ""
     onebot_access_token: str = ""
 
+    observability_queue_capacity: int = 2048
+    observability_batch_size: int = 50
+    observability_flush_interval_seconds: float = 0.5
+    observability_shutdown_timeout_seconds: float = 10.0
+    observability_retention_days: int = 30
+    observability_retention_interval_hours: int = 24
+    observability_system_sample_seconds: float = 5.0
+
     model_config = ConfigDict(
         env_file=".env",
         case_sensitive=False,
@@ -67,6 +75,26 @@ class Settings(BaseSettings):
         if errors:
             raise ValueError("; ".join(errors))
 
+        return self
+
+    @model_validator(mode="after")
+    def validate_observability_limits(self):
+        positive_values = {
+            "OBSERVABILITY_QUEUE_CAPACITY": self.observability_queue_capacity,
+            "OBSERVABILITY_BATCH_SIZE": self.observability_batch_size,
+            "OBSERVABILITY_FLUSH_INTERVAL_SECONDS": self.observability_flush_interval_seconds,
+            "OBSERVABILITY_SHUTDOWN_TIMEOUT_SECONDS": self.observability_shutdown_timeout_seconds,
+            "OBSERVABILITY_RETENTION_DAYS": self.observability_retention_days,
+            "OBSERVABILITY_RETENTION_INTERVAL_HOURS": self.observability_retention_interval_hours,
+            "OBSERVABILITY_SYSTEM_SAMPLE_SECONDS": self.observability_system_sample_seconds,
+        }
+        invalid = [name for name, value in positive_values.items() if value <= 0]
+        if invalid:
+            raise ValueError(f"must be positive: {', '.join(invalid)}")
+        if self.observability_batch_size > self.observability_queue_capacity:
+            raise ValueError(
+                "OBSERVABILITY_BATCH_SIZE cannot exceed OBSERVABILITY_QUEUE_CAPACITY"
+            )
         return self
 
     @property

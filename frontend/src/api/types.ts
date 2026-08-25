@@ -52,11 +52,9 @@ export interface RecentLog {
   user_id: number
   group_id: number
   command: string
-  /** success / error / cooldown（notfound 已被后端过滤，不会出现） */
-  status: 'success' | 'error' | 'cooldown'
+  status: ObservabilityStatus
   response_time_ms: number
-  /** 成功日志为 null */
-  error_message: string | null
+  error_code: string | null
   /** ISO 字符串；真实后端在记录无时间时返回 null */
   created_at: string | null
 }
@@ -75,7 +73,80 @@ export interface SystemInfo {
   cpu_percent: number
   memory_mb: number
   memory_total_mb: number
+  memory_percent: number
+  disk_used_gb: number
+  disk_total_gb: number
+  disk_percent: number
+  uptime_seconds: number
   cpu_model: string
+  sampled_at: number
+}
+
+export type KnownObservabilityStatus =
+  | 'success'
+  | 'error'
+  | 'cooldown'
+  | 'notfound'
+  | 'no_image'
+  | 'file_missing'
+
+/** Backend may add a state before this frontend is upgraded. */
+export type ObservabilityStatus = KnownObservabilityStatus | (string & {})
+
+export interface MetricsPoint {
+  bucket: string
+  total: number
+  success: number
+}
+
+export interface TopVoiceActor {
+  id: number
+  name: string
+  requests: number
+}
+
+export interface RecentErrorCode {
+  error_code: string
+  count: number
+  last_seen_at: string
+}
+
+export interface QueueMetrics {
+  accepted: number
+  dropped: number
+  written: number
+  write_failures: number
+  failed_events: number
+  backlog: number
+  capacity: number
+}
+
+export interface MetricsData {
+  range: '24h' | '7d' | '30d'
+  from: string
+  to: string
+  total_requests: number
+  success_rate: number
+  duration_ms: { p50: number | null; p95: number | null; p99: number | null }
+  active_users: number
+  active_groups: number
+  status_distribution: Record<string, number>
+  time_series: MetricsPoint[]
+  top_voice_actors: TopVoiceActor[]
+  recent_error_codes: RecentErrorCode[]
+  queue: QueueMetrics
+  system: SystemInfo
+}
+
+export interface DependencyReadiness {
+  ready: boolean
+  error_code: string | null
+}
+
+export interface ReadinessData {
+  ready: boolean
+  database: DependencyReadiness
+  onebot: DependencyReadiness & { connected_bots: number }
 }
 
 // ---------- 请求参数与辅助类型 ----------

@@ -157,14 +157,15 @@ class RequestLog(Base):
     __tablename__ = "request_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, nullable=False)
-    group_id = Column(Integer)
+    user_id = Column(BigInteger, nullable=False)
+    group_id = Column(BigInteger)
     command = Column(String(64), nullable=False)
     voice_actor_id = Column(Integer)
     image_id = Column(Integer)
     status = Column(String(32), default="success")
     response_time_ms = Column(Integer)
     error_message = Column(Text)
+    error_code = Column(String(64))
     created_at = Column(TIMESTAMP, default=datetime.utcnow)
 
     __table_args__ = (
@@ -172,6 +173,8 @@ class RequestLog(Base):
         Index("idx_group_id", "group_id"),
         Index("idx_command", "command"),
         Index("idx_created_at", "created_at"),
+        Index("idx_request_logs_created_status", "created_at", "status"),
+        Index("idx_request_logs_created_command", "created_at", "command"),
     )
 
     def __repr__(self):

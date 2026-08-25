@@ -1,262 +1,228 @@
 <script setup lang="ts">
-// 概览页：总量统计（5 个 el-statistic）+ 最近 20 条请求表格 + 系统资源占用
-// 默认 30s 自动刷新（el-radio-group 可选 10s/30s/60s/关闭，与原面板刷新行为一致），另有手动刷新按钮
-// 数据源：Task 3 的 api.overview() + api.systemInfo()，dev 模式由 mock 拦截 /admin/api/*
-import { computed, onActivated, onDeactivated, onMounted, ref } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import 'element-plus/es/components/message/style/css'
 import api from '../api'
-import type { OverviewData, RecentLog, SystemInfo } from '../api'
+import type { KnownObservabilityStatus, MetricsData, ObservabilityStatus, ReadinessData } from '../api'
 
-// 显式组件名：AdminLayout 的 keep-alive 靠 name 匹配缓存实例
 defineOptions({ name: 'OverviewView' })
 
+type RangeKey = '24h' | '7d' | '30d'
+type TagType = 'success' | 'danger' | 'warning' | 'info' | 'primary'
+
+const rangeKey = ref<RangeKey>('24h')
 const loading = ref(false)
-const overview = ref<OverviewData | null>(null)
-const systemInfo = ref<SystemInfo | null>(null)
-
-/** 自动刷新间隔（秒），0 表示关闭；默认 30s */
-const autoRefreshSeconds = ref(30)
-
-/** 最近请求：最多渲染 20 条（前端兜底，防止后端返回超量数据） */
-const recentLogs = computed<RecentLog[]>(() => overview.value?.recent_logs?.slice(0, 20) ?? [])
-
+const metrics = ref<MetricsData | null>(null)
+const readiness = ref<ReadinessData | null>(null)
 let timer: number | undefined
-let lastErrorMsg = ''
+let lastError = ''
 
-/** 请求状态 → 中文文案 + el-tag 颜色（success/error/cooldown） */
-const statusMeta: Record<RecentLog['status'], { label: string; tagType: 'success' | 'danger' | 'warning' }> = {
+/** Record forces compile-time coverage whenever KnownObservabilityStatus grows. */
+const knownStatusMeta: Record<KnownObservabilityStatus, { label: string; tagType: TagType }> = {
   success: { label: '成功', tagType: 'success' },
-  error: { label: '失败', tagType: 'danger' },
+  error: { label: '错误', tagType: 'danger' },
   cooldown: { label: '冷却', tagType: 'warning' },
+  notfound: { label: '未找到', tagType: 'info' },
+  no_image: { label: '无图片', tagType: 'warning' },
+  file_missing: { label: '文件缺失', tagType: 'danger' },
 }
 
-/** 状态元信息兜底：未知/异常 status 按 success 显示，避免取 undefined 后 .tagType 崩溃整表渲染 */
-function statusMetaOf(status: string): { label: string; tagType: 'success' | 'danger' | 'warning' } {
-  return statusMeta[status as RecentLog['status']] ?? statusMeta.success
+function statusMetaOf(status: ObservabilityStatus) {
+  return knownStatusMeta[status as KnownObservabilityStatus] ?? {
+    label: `未知（${status}）`,
+    tagType: 'info' as TagType,
+  }
 }
 
-/** ISO 时间 → "MM-DD HH:mm:ss"；真实后端可能返回 null，显示 '-' */
-function formatTime(iso: string | null): string {
-  if (!iso) return '-'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '-'
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+const maxTrend = computed(() =>
+  Math.max(1, ...(metrics.value?.time_series.map((point) => point.total) ?? [1])),
+)
+const maxActorRequests = computed(() =>
+  Math.max(1, ...(metrics.value?.top_voice_actors.map((actor) => actor.requests) ?? [1])),
+)
+const statusRows = computed(() =>
+  Object.entries(metrics.value?.status_distribution ?? {}).map(([status, count]) => ({
+    status,
+    count,
+    percentage: metrics.value?.total_requests
+      ? Math.round((count / metrics.value.total_requests) * 1000) / 10
+      : 0,
+  })),
+)
+
+function formatDuration(value: number | null | undefined): string {
+  if (value == null) return '-'
+  return value < 1000 ? `${value} ms` : `${(value / 1000).toFixed(2)} s`
 }
 
-/** 耗时：<1000ms 显示毫秒，否则显示秒；为 null/undefined（真实后端可能缺省）时显示 '-' */
-function formatDuration(ms: number | null | undefined): string {
-  if (ms == null) return '-'
-  if (ms < 1000) return `${ms} ms`
-  return `${(ms / 1000).toFixed(2)} s`
+function formatUptime(seconds = 0): string {
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  return days ? `${days}天 ${hours}小时` : `${hours}小时 ${minutes}分`
 }
 
-/** 内存占用百分比（0-100），用于 el-progress */
-const memoryPercent = computed<number>(() => {
-  const info = systemInfo.value
-  if (!info || !info.memory_total_mb) return 0
-  return Math.min(100, Math.round(((info.memory_mb || 0) / info.memory_total_mb) * 100))
-})
-
-function cpuProgressFormat(_percent: number): string {
-  return systemInfo.value ? `${systemInfo.value.cpu_percent.toFixed(1)}%` : '0%'
-}
-
-function memoryProgressFormat(_percent: number): string {
-  const info = systemInfo.value
-  if (!info) return '0 / 0 MB'
-  return `${info.memory_mb.toFixed(1)} / ${info.memory_total_mb} MB`
+function formatBucket(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  if (rangeKey.value === '24h') return `${String(date.getHours()).padStart(2, '0')}:00`
+  return `${date.getMonth() + 1}/${date.getDate()}`
 }
 
 async function loadAll() {
   loading.value = true
   try {
-    const [o, s] = await Promise.all([api.overview(), api.systemInfo()])
-    overview.value = o
-    systemInfo.value = s
-    lastErrorMsg = ''
-  } catch (e) {
-    // 自动刷新失败时只提示一次，避免 30s 一次重复弹窗
-    const msg = e instanceof Error ? e.message : '加载失败'
-    if (msg !== lastErrorMsg) {
-      lastErrorMsg = msg
-      ElMessage.error(msg)
-    }
+    const [nextMetrics, nextReadiness] = await Promise.all([
+      api.metrics(rangeKey.value),
+      api.readiness(),
+    ])
+    metrics.value = nextMetrics
+    readiness.value = nextReadiness
+    lastError = ''
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '加载运行指标失败'
+    if (message !== lastError) ElMessage.error(message)
+    lastError = message
   } finally {
     loading.value = false
   }
 }
 
 function stopTimer() {
-  if (timer !== undefined) {
-    window.clearInterval(timer)
-    timer = undefined
-  }
+  if (timer !== undefined) window.clearInterval(timer)
+  timer = undefined
 }
-
-/** 按当前选择的间隔重建定时器（切换间隔 / 初次挂载时调用） */
-function restartTimer() {
+function startTimer() {
   stopTimer()
-  if (autoRefreshSeconds.value > 0) {
-    timer = window.setInterval(() => void loadAll(), autoRefreshSeconds.value * 1000)
-  }
+  timer = window.setInterval(() => void loadAll(), 30_000)
 }
 
-onMounted(() => {
-  void loadAll()
-  restartTimer()
-})
-
-// keep-alive 缓存后组件不卸载：切走暂停自动刷新定时器，切回恢复，避免后台空跑
-onActivated(() => {
-  restartTimer()
-})
-
+watch(rangeKey, () => void loadAll())
+onMounted(() => { void loadAll(); startTimer() })
+onActivated(startTimer)
 onDeactivated(stopTimer)
 </script>
 
 <template>
-  <div class="overview">
-    <!-- 顶部：5 个总量统计 -->
-    <div class="stat-grid">
-      <el-card shadow="never">
-        <el-statistic title="声优总数" :value="overview?.voice_actor_total ?? 0" />
-      </el-card>
-      <el-card shadow="never">
-        <el-statistic title="图片总数" :value="overview?.image_total ?? 0" />
-      </el-card>
-      <el-card shadow="never">
-        <el-statistic title="别名总数" :value="overview?.alias_total ?? 0" />
-      </el-card>
-      <el-card shadow="never">
-        <el-statistic title="24h 请求量" :value="overview?.request_24h ?? 0" />
-      </el-card>
-      <el-card shadow="never">
-        <el-statistic
-          title="24h 成功率"
-          :value="overview?.success_rate_24h ?? 0"
-          :precision="1"
-          suffix="%"
-        />
-      </el-card>
+  <div class="overview" v-loading="loading">
+    <div class="toolbar">
+      <el-radio-group v-model="rangeKey">
+        <el-radio-button value="24h">24 小时</el-radio-button>
+        <el-radio-button value="7d">7 天</el-radio-button>
+        <el-radio-button value="30d">30 天</el-radio-button>
+      </el-radio-group>
+      <el-button type="primary" :loading="loading" @click="loadAll">刷新</el-button>
     </div>
 
-    <!-- 最近请求 + 系统信息 -->
+    <div class="stat-grid">
+      <el-card shadow="never"><el-statistic title="请求量" :value="metrics?.total_requests ?? 0" /></el-card>
+      <el-card shadow="never"><el-statistic title="成功率" :value="metrics?.success_rate ?? 0" :precision="1" suffix="%" /></el-card>
+      <el-card shadow="never"><div class="text-stat"><span>P95 耗时</span><strong>{{ formatDuration(metrics?.duration_ms.p95) }}</strong></div></el-card>
+      <el-card shadow="never"><el-statistic title="活跃用户" :value="metrics?.active_users ?? 0" /></el-card>
+      <el-card shadow="never"><el-statistic title="活跃群" :value="metrics?.active_groups ?? 0" /></el-card>
+      <el-card shadow="never"><div class="text-stat"><span>运行时长</span><strong>{{ formatUptime(metrics?.system.uptime_seconds) }}</strong></div></el-card>
+    </div>
+
     <el-row :gutter="16" class="content-row">
-      <el-col :span="16">
-        <el-card shadow="never" class="logs-card">
-          <template #header>
-            <div class="card-header">
-              <span class="card-title">最近 20 条请求</span>
-              <div class="refresh-controls">
-                <el-radio-group v-model="autoRefreshSeconds" size="small" @change="restartTimer">
-                  <el-radio-button :value="10">10s</el-radio-button>
-                  <el-radio-button :value="30">30s</el-radio-button>
-                  <el-radio-button :value="60">60s</el-radio-button>
-                  <el-radio-button :value="0">关闭</el-radio-button>
-                </el-radio-group>
-                <el-button size="small" type="primary" :loading="loading" @click="loadAll">
-                  刷新
-                </el-button>
+      <el-col :xs="24" :lg="16">
+        <el-card shadow="never">
+          <template #header><span class="card-title">请求趋势</span></template>
+          <div class="trend-chart">
+            <div v-for="point in metrics?.time_series ?? []" :key="point.bucket" class="trend-column">
+              <div class="trend-count">{{ point.total }}</div>
+              <div class="trend-track">
+                <div class="trend-success" :style="{ height: `${(point.success / maxTrend) * 100}%` }" />
+                <div class="trend-failed" :style="{ height: `${((point.total - point.success) / maxTrend) * 100}%` }" />
               </div>
+              <div class="trend-label">{{ formatBucket(point.bucket) }}</div>
             </div>
-          </template>
-          <el-table :data="recentLogs" :loading="loading" stripe size="default">
-            <el-table-column label="时间" min-width="150">
-              <template #default="{ row }">
-                {{ formatTime(row.created_at) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="用户" prop="user_id" min-width="110" />
-            <el-table-column label="状态" min-width="90">
-              <template #default="{ row }">
-                <el-tag :type="statusMetaOf(row.status).tagType" size="small">
-                  {{ statusMetaOf(row.status).label }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="耗时" min-width="90">
-              <template #default="{ row }">
-                {{ formatDuration(row.response_time_ms) }}
-              </template>
-            </el-table-column>
-          </el-table>
+          </div>
+          <div class="legend"><span class="dot success-dot" />成功 <span class="dot failed-dot" />其他</div>
         </el-card>
       </el-col>
-      <el-col :span="8">
-        <el-card shadow="never" class="sys-card">
-          <template #header>
-            <span class="card-title">系统信息</span>
-          </template>
-          <div class="sys-row">
-            <div class="sys-label">CPU 占用</div>
-            <el-progress
-              :percentage="systemInfo?.cpu_percent ?? 0"
-              :format="cpuProgressFormat"
-              :stroke-width="14"
-            />
-          </div>
-          <div class="sys-row">
-            <div class="sys-label">内存占用</div>
-            <el-progress
-              :percentage="memoryPercent"
-              :format="memoryProgressFormat"
-              :stroke-width="14"
-            />
-          </div>
-          <div class="sys-model" title="CPU 型号">
-            {{ systemInfo?.cpu_model ?? '加载中…' }}
+      <el-col :xs="24" :lg="8">
+        <el-card shadow="never" class="fill-card">
+          <template #header><span class="card-title">状态分布</span></template>
+          <div v-for="row in statusRows" :key="row.status" class="status-row">
+            <div class="status-head">
+              <el-tag :type="statusMetaOf(row.status).tagType" size="small">{{ statusMetaOf(row.status).label }}</el-tag>
+              <span>{{ row.count }}</span>
+            </div>
+            <el-progress :percentage="row.percentage" :stroke-width="8" />
           </div>
         </el-card>
       </el-col>
     </el-row>
+
+    <el-row :gutter="16" class="content-row">
+      <el-col :xs="24" :lg="8">
+        <el-card shadow="never" class="fill-card">
+          <template #header><span class="card-title">热门声优</span></template>
+          <el-empty v-if="!metrics?.top_voice_actors.length" description="暂无数据" :image-size="70" />
+          <div v-for="(actor, index) in metrics?.top_voice_actors ?? []" :key="actor.id" class="actor-row">
+            <span class="actor-rank">{{ index + 1 }}</span>
+            <div class="actor-main">
+              <div class="actor-title"><span>{{ actor.name }}</span><span>{{ actor.requests }}</span></div>
+              <div class="actor-bar"><span :style="{ width: `${(actor.requests / maxActorRequests) * 100}%` }" /></div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+
+      <el-col :xs="24" :lg="8">
+        <el-card shadow="never" class="fill-card">
+          <template #header><span class="card-title">系统资源</span></template>
+          <div class="resource-row"><span>CPU</span><el-progress :percentage="metrics?.system.cpu_percent ?? 0" /></div>
+          <div class="resource-row"><span>内存 {{ metrics?.system.memory_mb ?? 0 }} MB</span><el-progress :percentage="metrics?.system.memory_percent ?? 0" /></div>
+          <div class="resource-row"><span>磁盘 {{ metrics?.system.disk_used_gb ?? 0 }} / {{ metrics?.system.disk_total_gb ?? 0 }} GB</span><el-progress :percentage="metrics?.system.disk_percent ?? 0" /></div>
+          <div class="percentiles">
+            <span>P50 {{ formatDuration(metrics?.duration_ms.p50) }}</span>
+            <span>P95 {{ formatDuration(metrics?.duration_ms.p95) }}</span>
+            <span>P99 {{ formatDuration(metrics?.duration_ms.p99) }}</span>
+          </div>
+        </el-card>
+      </el-col>
+
+      <el-col :xs="24" :lg="8">
+        <el-card shadow="never" class="fill-card">
+          <template #header><span class="card-title">就绪与统计队列</span></template>
+          <div class="readiness-row"><span>数据库</span><el-tag :type="readiness?.database.ready ? 'success' : 'danger'">{{ readiness?.database.ready ? '可用' : '不可用' }}</el-tag></div>
+          <div class="readiness-row"><span>OneBot</span><el-tag :type="readiness?.onebot.ready ? 'success' : 'danger'">{{ readiness?.onebot.ready ? '已连接' : '未连接' }}</el-tag></div>
+          <el-divider />
+          <div class="queue-grid">
+            <div><strong>{{ metrics?.queue.backlog ?? 0 }}</strong><span>当前积压</span></div>
+            <div><strong>{{ metrics?.queue.dropped ?? 0 }}</strong><span>累计丢弃</span></div>
+            <div><strong>{{ metrics?.queue.write_failures ?? 0 }}</strong><span>写入失败批次</span></div>
+            <div><strong>{{ metrics?.queue.failed_events ?? 0 }}</strong><span>失败事件</span></div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-card v-if="metrics?.recent_error_codes.length" shadow="never" class="content-row">
+      <template #header><span class="card-title">最近错误码</span></template>
+      <el-table :data="metrics.recent_error_codes" size="small" stripe>
+        <el-table-column prop="error_code" label="错误码" />
+        <el-table-column prop="count" label="次数" width="100" />
+        <el-table-column prop="last_seen_at" label="最近出现" />
+      </el-table>
+    </el-card>
   </div>
 </template>
 
 <style scoped>
-.stat-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-}
-
-.content-row {
-  margin-top: 16px;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.card-title {
-  font-weight: 600;
-}
-
-.refresh-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.sys-row {
-  margin-bottom: 18px;
-}
-
-.sys-label {
-  margin-bottom: 8px;
-  color: var(--el-text-color-secondary);
-  font-size: 14px;
-}
-
-.sys-model {
-  margin-top: 8px;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-  word-break: break-all;
-}
+.toolbar { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 16px; }
+.text-stat { display: flex; flex-direction: column; }.text-stat span { color: var(--el-text-color-regular); font-size: 14px; }.text-stat strong { margin-top: 8px; color: var(--el-text-color-primary); font-size: 24px; font-weight: 400; line-height: 1.4; }
+.content-row { margin-top: 16px; }.fill-card { height: calc(100% - 16px); }.card-title { font-weight: 600; }
+.trend-chart { height: 245px; display: flex; align-items: flex-end; gap: 6px; overflow-x: auto; padding: 8px 2px 0; }
+.trend-column { min-width: 24px; flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; }
+.trend-count { height: 20px; color: var(--el-text-color-secondary); font-size: 11px; }.trend-track { flex: 1; width: 70%; display: flex; flex-direction: column-reverse; background: var(--el-fill-color-light); border-radius: 3px 3px 0 0; overflow: hidden; }
+.trend-success { background: var(--el-color-success); }.trend-failed { background: var(--el-color-danger-light-3); }.trend-label { height: 30px; padding-top: 7px; color: var(--el-text-color-secondary); font-size: 10px; white-space: nowrap; }
+.legend { display: flex; justify-content: flex-end; align-items: center; gap: 6px; color: var(--el-text-color-secondary); font-size: 12px; }.dot { width: 8px; height: 8px; border-radius: 50%; margin-left: 8px; }.success-dot { background: var(--el-color-success); }.failed-dot { background: var(--el-color-danger-light-3); }
+.status-row { margin-bottom: 13px; }.status-head { display: flex; justify-content: space-between; margin-bottom: 6px; }
+.actor-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }.actor-rank { width: 22px; color: var(--el-text-color-secondary); text-align: center; }.actor-main { flex: 1; }.actor-title { display: flex; justify-content: space-between; font-size: 14px; }.actor-bar { height: 5px; margin-top: 5px; background: var(--el-fill-color); border-radius: 3px; overflow: hidden; }.actor-bar span { display: block; height: 100%; background: var(--el-color-primary); }
+.resource-row { margin-bottom: 18px; }.resource-row > span { display: block; margin-bottom: 7px; font-size: 13px; }.percentiles { display: flex; justify-content: space-between; color: var(--el-text-color-secondary); font-size: 12px; }
+.readiness-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }.queue-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }.queue-grid div { display: flex; flex-direction: column; }.queue-grid strong { font-size: 20px; }.queue-grid span { color: var(--el-text-color-secondary); font-size: 12px; }
+@media (max-width: 767px) { .toolbar { align-items: flex-start; flex-direction: column; }.trend-column { min-width: 28px; } }
 </style>

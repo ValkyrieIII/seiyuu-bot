@@ -47,4 +47,6 @@ COPY backend ./backend
 COPY Dockerfile docker-compose.yml docker-compose.dev.yml docker-compose.test.yml docker-compose.prod.yml pyproject.toml ./
 COPY .env.dev.example .env.test.example .env.prod.example ./
 COPY tests ./tests
+# 前端契约测试直接校验 Overview 源码，测试镜像只复制所需文件而不安装 Node 依赖。
+COPY frontend/src/views/OverviewView.vue ./frontend/src/views/OverviewView.vue
 CMD ["python", "-m", "pytest", "-q", "tests"]

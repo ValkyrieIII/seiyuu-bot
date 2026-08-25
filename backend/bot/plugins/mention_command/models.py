@@ -11,7 +11,6 @@ from sqlalchemy import (
     Date,
     TIMESTAMP,
     Index,
-    text,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -66,28 +65,6 @@ def init_db():
     """初始化数据库（创建签到表）"""
     try:
         Base.metadata.create_all(bind=engine)
-
-        # 兼容旧表：尝试添加新字段
-        session = get_session()
-        try:
-            for col_name, col_type in [
-                ("lucky_actor_id", "INTEGER"),
-                ("lucky_image_id", "INTEGER"),
-            ]:
-                try:
-                    session.execute(
-                        text(
-                            f"ALTER TABLE check_ins ADD COLUMN {col_name} {col_type} DEFAULT NULL"
-                        )
-                    )
-                    session.commit()
-                    logger.info(f"签到表新增字段: {col_name}")
-                except Exception:
-                    session.rollback()
-                    logger.debug(f"签到表字段 {col_name} 已存在，跳过")
-        finally:
-            session.close()
-
         logger.info("签到表初始化完成")
     except Exception as e:
         logger.error(f"签到表初始化失败: {e}", exc_info=True)
