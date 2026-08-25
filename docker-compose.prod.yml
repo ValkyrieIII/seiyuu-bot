@@ -14,6 +14,7 @@ services:
       NONEBOT_ADAPTER_ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:?ONEBOT_ACCESS_TOKEN is required in production}
       ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:?ONEBOT_ACCESS_TOKEN is required in production}
       BOT_QQ: ${BOT_QQ:?BOT_QQ is required in production}
+      GRAB_TARGET_QQ: ${GRAB_TARGET_QQ:-}
     volumes:
       - ${IMAGES_PATH:-./images}:/app/images
       - ${LOGS_PATH:-./logs}:/app/logs
