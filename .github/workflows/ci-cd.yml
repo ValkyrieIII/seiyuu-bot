@@ -157,6 +157,7 @@ jobs:
           file: ./Dockerfile
           target: runtime
           push: true
+          provenance: false
           tags: ${{ env.NONEBOT_IMAGE }}:${{ env.IMAGE_TAG }}
 
       - name: Build and push frontend image
@@ -166,6 +167,7 @@ jobs:
           file: ./frontend/Dockerfile
           target: runtime
           push: true
+          provenance: false
           tags: ${{ env.FRONTEND_IMAGE }}:${{ env.IMAGE_TAG }}
 
   deploy:
