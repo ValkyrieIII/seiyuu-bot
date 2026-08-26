@@ -15,6 +15,7 @@ from loguru import logger
 from sqlalchemy import func
 
 from bot.config import settings
+from bot.plugins.voice_actor.services import invalidate_known_names
 from .schemas import AliasCreate, VoiceActorCreate, VoiceActorUpdate, ImageUpdate
 
 # voice_actor 模型/工具延迟导入，避免在 NoneBot 插件加载前 import 导致插件注册失败
@@ -267,6 +268,7 @@ def register_admin_routes(driver) -> None:
             )
             session.add(alias)
             session.commit()
+            invalidate_known_names()
             return ok({"id": alias.id})
         finally:
             session.close()
@@ -281,6 +283,7 @@ def register_admin_routes(driver) -> None:
                 raise HTTPException(status_code=404, detail="alias not found")
             session.delete(alias)
             session.commit()
+            invalidate_known_names()
             return ok({"deleted": True})
         finally:
             session.close()

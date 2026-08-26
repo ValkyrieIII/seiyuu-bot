@@ -10,6 +10,47 @@ from sqlalchemy import and_, or_, func
 from .models import VoiceActor, Image, Alias, UserCooldown, RequestLog, get_session
 from bot.config import settings
 
+# ---------------------------------------------------------------------------
+# 别名词表缓存：拦截层用，避免每条群闲聊消息都打满 3 次 SQL
+#
+# 内容 = aliases.alias_name(活跃) ∪ voice_actors.name(活跃)，只回答"能否命中"，
+# 不参与解析语义；写操作后整表重建（全量才几毫秒，不值得做增量维护）。
+# 仅适用于单进程内有效；若用离线脚本改库（scripts/manage_aliases.py），
+# 需重启机器人进程或调用 invalidate_known_names() 所在进程。
+# ---------------------------------------------------------------------------
+_known_names_cache: Optional[frozenset] = None
+
+
+def get_known_names() -> frozenset:
+    """获取可命中的别名词表（首次调用时全量加载，此后常驻内存）"""
+    global _known_names_cache
+    if _known_names_cache is None:
+        session = get_session()
+        try:
+            names = {
+                row[0]
+                for row in session.query(Alias.alias_name).filter(
+                    Alias.is_active == True
+                )
+            }
+            names.update(
+                row[0]
+                for row in session.query(VoiceActor.name).filter(
+                    VoiceActor.is_active == True
+                )
+            )
+        finally:
+            session.close()
+        logger.info(f"已加载别名词表缓存，共 {len(names)} 条")
+        _known_names_cache = frozenset(names)
+    return _known_names_cache
+
+
+def invalidate_known_names() -> None:
+    """置空词表缓存，下一条消息触发时自动全量重建"""
+    global _known_names_cache
+    _known_names_cache = None
+
 
 class VoiceActorService:
     """声优业务服务"""
@@ -218,6 +259,8 @@ class AliasService:
             )
             session.add(alias)
             session.commit()
+            # 写后失效：词表是全量快照，不做增量维护，置 None 由下一条消息重建
+            invalidate_known_names()
             logger.info(f"添加全局别名: {alias_name} -> {voice_actor_id}")
             return True
         except Exception as e:

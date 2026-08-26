@@ -10,11 +10,10 @@ from nonebot import on_message
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, MessageSegment, Message
 from nonebot.matcher import Matcher
 from bot.config import settings
-from .services import AliasService, CooldownService, ImageService
+from .services import AliasService, CooldownService, ImageService, get_known_names
 from bot.observability import (
     elapsed_ms,
     record_event,
-    should_record_notfound,
 )
 
 # 创建消息匹配器 - 监听所有群消息
@@ -43,24 +42,23 @@ async def handle_voice_actor_message(event: GroupMessageEvent, matcher: Matcher)
         user_id = event.user_id
         group_id = event.group_id
 
-        # These explicit commands are owned by mention_command and must not become
-        # voice-actor notfound events when matcher propagation continues.
+        # These explicit commands are owned by mention_command and must not
+        # be misattributed to the voice-actor resolver when propagation continues.
         if event.is_tome() and message_text in {"签到", "声优列表"}:
+            return
+
+        # 词表拦截：不在别名词表内的文本（绝大多数群闲聊）直接跳过。
+        # 本业务只能观测"命中"，未命中不可观测（无法区分闲聊与找图意图），
+        # 因此不发任何事件；不存在 notfound 状态。
+        if message_text not in get_known_names():
             return
 
         # Resolve before cooldown so unrelated ordinary group chat is never logged.
         voice_actor = AliasService.resolve_alias(message_text, user_id)
 
         if not voice_actor:
-            if should_record_notfound(event.is_tome()):
-                record_event(
-                    user_id=user_id,
-                    group_id=group_id,
-                    command="voice_actor",
-                    status="notfound",
-                    duration_ms=elapsed_ms(start_ns),
-                    error_code="VOICE_ACTOR_NOT_FOUND",
-                )
+            # 词表命中但解析失败（如缓存重建窗口内的陈旧词条）：静默退出。
+            logger.debug(f"词表命中但未解析到声优: {message_text}")
             return
 
         should_report_failure = True
