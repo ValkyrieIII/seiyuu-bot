@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  TCR_REGISTRY: ccr.ccs.tencentyun.com
+  TCR_REGISTRY: crpi-ioxf08nbxutvou03.cn-guangzhou.personal.cr.aliyuncs.com
   TCR_NAMESPACE: ${{ vars.TCR_NAMESPACE }}
   TCR_REPOSITORY: ${{ vars.TCR_REPOSITORY || 'seiyuu-bot' }}
   IMAGE_TAG: sha-${{ github.sha }}
