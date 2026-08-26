@@ -108,6 +108,8 @@ chmod 600 .env.prod
 - `ONEBOT_ACCESS_TOKEN`
 - `BOT_QQ`
 - `NAPCAT_IMAGE`（填写经过验证的固定版本标签或镜像摘要）
+- `NONEBOT_IMAGE`（生产服务器当前使用的后端镜像与 tag）
+- `FRONTEND_IMAGE`（生产服务器当前使用的前端镜像与 tag）
 
 先验证合并后的 Compose 配置：
 
@@ -118,8 +120,11 @@ docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod
 再启动：
 
 ```bash
-docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml pull nonebot frontend
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build --no-deps nonebot frontend
 ```
+
+生产镜像由 CI 推送到腾讯云 TCR。服务器端 `deploy.sh` 接收一个 `sha-<commit>` 参数，并在执行 Compose 命令时设置对应的 `NONEBOT_IMAGE` 与 `FRONTEND_IMAGE`。NapCat 和 MySQL 不属于普通应用发布范围。
 
 默认前端入口绑定到宿主机 `127.0.0.1:80`；启用内置 NapCat 时，其管理端口也只绑定 `127.0.0.1`。MySQL 和 NoneBot 不直接对外开放。推荐在前端入口前部署 Caddy、Nginx 或云负载均衡负责 HTTPS。外部监控可请求前端入口的 `/health`。
 
@@ -132,10 +137,11 @@ docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod
 docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml logs -f nonebot
 ```
 
-部署新版本时重新构建并滚动启动：
+部署新版本时拉取镜像并更新业务容器：
 
 ```bash
-docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml pull nonebot frontend
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build --no-deps nonebot frontend
 ```
 
 不要在生产环境运行 `down -v`，该命令会删除 MySQL 数据卷。
