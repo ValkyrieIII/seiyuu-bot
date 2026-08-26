@@ -125,11 +125,12 @@ async def handle_mention_command(event: MessageEvent, matcher: Matcher):
 
             if not actors:
                 await matcher.send("当前没有可用的活跃声优")
+                # 查询型命令的合法空结果，用 error 表达 "服务端无数据"
                 record_event(
                     user_id=event.user_id,
                     group_id=group_id,
                     command="voice_actor_list",
-                    status="notfound",
+                    status="error",
                     duration_ms=elapsed_ms(start_ns),
                     error_code="NO_ACTIVE_VOICE_ACTORS",
                 )

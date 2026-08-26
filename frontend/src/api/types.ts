@@ -86,7 +86,6 @@ export type KnownObservabilityStatus =
   | 'success'
   | 'error'
   | 'cooldown'
-  | 'notfound'
   | 'no_image'
   | 'file_missing'
 

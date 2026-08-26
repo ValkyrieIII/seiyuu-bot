@@ -22,7 +22,6 @@ const knownStatusMeta: Record<KnownObservabilityStatus, { label: string; tagType
   success: { label: '成功', tagType: 'success' },
   error: { label: '错误', tagType: 'danger' },
   cooldown: { label: '冷却', tagType: 'warning' },
-  notfound: { label: '未找到', tagType: 'info' },
   no_image: { label: '无图片', tagType: 'warning' },
   file_missing: { label: '文件缺失', tagType: 'danger' },
 }

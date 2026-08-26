@@ -12,7 +12,6 @@ class EventStatus(str, Enum):
     SUCCESS = "success"
     ERROR = "error"
     COOLDOWN = "cooldown"
-    NOTFOUND = "notfound"
     NO_IMAGE = "no_image"
     FILE_MISSING = "file_missing"
 
@@ -27,11 +26,6 @@ def elapsed_ms(start_ns: int, end_ns: Optional[int] = None) -> int:
     if end_ns is None:
         end_ns = time.perf_counter_ns()
     return max(0, (end_ns - start_ns) // 1_000_000)
-
-
-def should_record_notfound(is_explicit_mention: bool) -> bool:
-    """Only an explicit mention authorizes recording an unmatched query."""
-    return is_explicit_mention
 
 
 @dataclass(frozen=True)

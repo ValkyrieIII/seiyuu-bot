@@ -9,9 +9,9 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1] / "backend"
 sys.path.insert(0, str(BACKEND_ROOT))
 
 from bot.observability.events import (
+    EventStatus,
     ObservabilityEvent,
     elapsed_ms,
-    should_record_notfound,
 )
 from bot.observability.queries import calculate_percentiles, get_range_spec
 
@@ -52,9 +52,11 @@ def test_event_validation_and_storage_mapping_exclude_message_text():
         )
 
 
-def test_unmatched_ordinary_group_message_is_not_recordable():
-    assert should_record_notfound(False) is False
-    assert should_record_notfound(True) is True
+def test_notfound_status_is_retired():
+    """notfound 已废弃：本业务只能观测命中，未命中不可观测。"""
+    assert "notfound" not in {s.value for s in EventStatus}
+    with pytest.raises(ValueError):
+        ObservabilityEvent(command="voice_actor", status="notfound", user_id=1)
 
 
 def test_only_supported_metric_ranges_are_accepted():

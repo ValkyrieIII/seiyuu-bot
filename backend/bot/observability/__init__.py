@@ -1,6 +1,6 @@
 """Low-overhead, best-effort observability for the bot process."""
 
-from .events import EventStatus, ObservabilityEvent, elapsed_ms, should_record_notfound
+from .events import EventStatus, ObservabilityEvent, elapsed_ms
 from .recorder import get_recorder, record_event
 
 
@@ -34,7 +34,6 @@ __all__ = [
     "EventStatus",
     "ObservabilityEvent",
     "elapsed_ms",
-    "should_record_notfound",
     "get_recorder",
     "record_event",
     "register_observability_hooks",
