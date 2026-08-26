@@ -121,8 +121,8 @@ jobs:
     timeout-minutes: 45
 
     env:
-      NONEBOT_IMAGE: ccr.ccs.tencentyun.com/${{ vars.TCR_NAMESPACE }}/${{ vars.TCR_REPOSITORY || 'seiyuu-bot' }}-nonebot
-      FRONTEND_IMAGE: ccr.ccs.tencentyun.com/${{ vars.TCR_NAMESPACE }}/${{ vars.TCR_REPOSITORY || 'seiyuu-bot' }}-frontend
+      NONEBOT_IMAGE: ${{ env.TCR_REGISTRY }}/${{ vars.TCR_NAMESPACE }}/${{ vars.TCR_REPOSITORY || 'seiyuu-bot' }}-nonebot
+      FRONTEND_IMAGE: ${{ env.TCR_REGISTRY }}/${{ vars.TCR_NAMESPACE }}/${{ vars.TCR_REPOSITORY || 'seiyuu-bot' }}-frontend
 
     steps:
       - name: Checkout
