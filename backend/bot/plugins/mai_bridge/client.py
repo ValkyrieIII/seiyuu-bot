@@ -160,6 +160,8 @@ class MaiBridgeClient:
         self,
         *,
         group_id: str,
+        # 麦麦 v1.2.x 要求 group_name 必须为字符串，None 会导致入站预处理失败
+        group_name: str,
         user_id: str,
         nickname: str,
         cardname: Optional[str],
@@ -188,7 +190,11 @@ class MaiBridgeClient:
                 platform=self._platform,
                 message_id=message_id,
                 time=timestamp,
-                group_info=GroupInfo(platform=self._platform, group_id=str(group_id)),
+                group_info=GroupInfo(
+                    platform=self._platform,
+                    group_id=str(group_id),
+                    group_name=group_name or f"群{group_id}",
+                ),
                 user_info=UserInfo(
                     platform=self._platform,
                     user_id=str(user_id),

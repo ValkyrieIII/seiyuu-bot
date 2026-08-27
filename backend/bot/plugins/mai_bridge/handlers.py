@@ -24,6 +24,9 @@ _matcher = on_message(priority=60, block=False)
 
 _rate_limiter = ReplyRateLimiter(settings.mai_min_interval_seconds)
 _allowlist = parse_group_allowlist(settings.mai_allowed_groups)
+# 群名缓存：麦麦 v1.2.x 要求入站消息的 group_info.group_name 必须为字符串，
+# 取不到真实名称时用"群<id>"兑底
+_group_names: dict[int, str] = {}
 
 
 def _self_user_id() -> Optional[int]:
@@ -153,8 +156,21 @@ async def handle_forward_to_mai(event: GroupMessageEvent):
             logger.debug("消息不转发给麦麦({}): group_id={}", reason, event.group_id)
         return
 
+    # 解析群名（缓存优先），避免每条消息都查一次 OneBot API
+    gid = int(event.group_id)
+    group_name = _group_names.get(gid)
+    if group_name is None:
+        try:
+            info = await get_bot().call_api("get_group_info", group_id=gid)
+            group_name = str((info or {}).get("group_name") or "").strip() or f"群{gid}"
+        except Exception as exc:
+            logger.debug("获取群名失败，使用兑底: group_id={}, {}", gid, exc)
+            group_name = f"群{gid}"
+        _group_names[gid] = group_name
+
     sent = await client.send_group_chat(
         group_id=str(event.group_id),
+        group_name=group_name,
         user_id=str(event.user_id),
         nickname=event.sender.nickname or str(event.user_id),
         cardname=(event.sender.card or None),
