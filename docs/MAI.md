@@ -37,7 +37,7 @@ QQ ──NapCat──> nonebot
    ```bash
    COMPOSE_PROFILES=qq,mai      # dev 默认无 profiles 变量时按需追加
    MAI_ENABLED=true             # 总闸：false 时插件零行为
-   MAI_IMAGE=sengokucola/maibot:v1.2.3   # prod 必须固定版本
+   MAI_IMAGE=sengokucola/maibot:1.2.3   # prod 必须固定版本
    MAI_AUTH_TOKEN=<与 bot_config.toml 一致>
    ```
 

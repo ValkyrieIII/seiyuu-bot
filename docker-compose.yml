@@ -47,6 +47,12 @@ services:
       BOT_QQ: ${BOT_QQ:-}
       GROUP_ID: ${GROUP_ID:-}
       COOLDOWN_DURATION: ${COOLDOWN_DURATION:-1}
+      # MaiBot (麦麦) 桥接：透传给插件（文档 docs/MAI.md）
+      MAI_ENABLED: ${MAI_ENABLED:-false}
+      MAI_AUTH_TOKEN: ${MAI_AUTH_TOKEN:-}
+      MAI_ALLOWED_GROUPS: ${MAI_ALLOWED_GROUPS:-}
+      MAI_MIN_INTERVAL_SECONDS: ${MAI_MIN_INTERVAL_SECONDS:-10}
+      MAI_MAX_REPLY_LENGTH: ${MAI_MAX_REPLY_LENGTH:-1500}
       OBSERVABILITY_QUEUE_CAPACITY: ${OBSERVABILITY_QUEUE_CAPACITY:-2048}
       OBSERVABILITY_BATCH_SIZE: ${OBSERVABILITY_BATCH_SIZE:-50}
       OBSERVABILITY_FLUSH_INTERVAL_SECONDS: ${OBSERVABILITY_FLUSH_INTERVAL_SECONDS:-0.5}
@@ -102,7 +108,7 @@ services:
   # 不直连 QQ。启用：COMPOSE_PROFILES=qq,mai（且 MAI_ENABLED=true）。
   # 镜像默认值已固定版本；升级时用 MAI_IMAGE 覆盖为新 tag（不要用 latest 漂浮）。
   mai:
-    image: ${MAI_IMAGE:-sengokucola/maibot:v1.2.3}
+    image: ${MAI_IMAGE:-sengokucola/maibot:1.2.3}
     profiles: ["mai"]
     environment:
       TZ: ${TZ:-Asia/Shanghai}
