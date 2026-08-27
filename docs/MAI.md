@@ -50,6 +50,16 @@ QQ ──NapCat──> nonebot
 4. 首次启动后建议访问麦麦 WebUI（仅内网 `mai:8001`，需要临时映射端口或 SSH 隧道）
    完成人设初始化与行为微调。
 
+### 生产环境专项说明
+
+deploy.sh 只更新 nonebot/frontend，**永远不会拉起或触碰 mai 容器**，因此生产首次
+启用需在上面第 3 步的命令基础上手动执行一次；此后 mai 与 mysql/napcat 同类，
+属常驻基础设施，业务发版不影响它。升级麦麦只需修改 `.env.prod` 中 pin 的
+`MAI_IMAGE` tag 后重跑同一条命令。
+
+> 内存前提：麦麦核心镜像（faiss/scipy/pandas 等）常驻约 1-2GB，启用前先
+> `free -h` 确认服务器余量充足。
+
 ## 行为规则
 
 | 规则 | 实现 |
