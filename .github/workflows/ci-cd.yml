@@ -14,7 +14,9 @@ permissions:
 
 concurrency:
   group: qqbot-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+  # 新提交入队时立即取消仍在跑的旧构建：产物由 commit 决定可复现，旧流水线跑完没有意义
+  # （deploy.sh 自带回滚与失败重试，被取消的部署不会留下半更新状态）
+  cancel-in-progress: true
 
 env:
   TCR_REGISTRY: crpi-ioxf08nbxutvou03.cn-guangzhou.personal.cr.aliyuncs.com
