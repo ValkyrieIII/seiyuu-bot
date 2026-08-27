@@ -32,6 +32,11 @@ QQ ──NapCat──> nonebot
 
    `*.toml` 含密钥已被 .gitignore 忽略，只提交 `.example` 模板。
 
+   > 注意：`bot_config.toml` 的 `[bot] platform` 必须与桥接端 `MAI_PLATFORM_NAME`（默认
+   > `qqbot`）一致、`qq_account` 填机器人 QQ——Platform IO 依据它注册发送路由，留空会导致
+   > 麦麦能生成回复但报 "未命中任何发送路由" 发不出来。首启后麦麦会自动补全配置文件，
+   > 升级镜像后注意核对该段是否被保留。
+
 2. **开启环境开关**（`.env.dev` 或 `.env.prod`）：
 
    ```bash
