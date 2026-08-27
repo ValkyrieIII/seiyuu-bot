@@ -47,13 +47,6 @@ services:
       BOT_QQ: ${BOT_QQ:-}
       GROUP_ID: ${GROUP_ID:-}
       COOLDOWN_DURATION: ${COOLDOWN_DURATION:-1}
-      # MaiBot (麦麦) 桥接：透传给插件（文档 docs/MAI.md）
-      # 注意：maim_message 0.6.8 客户端不会自动补路径，必须带 /ws 后缀
-      MAI_ENABLED: ${MAI_ENABLED:-false}
-      MAI_WS_URL: ${MAI_WS_URL:-ws://mai:8000/ws}
-      MAI_AUTH_TOKEN: ${MAI_AUTH_TOKEN:-}
-      MAI_ALLOWED_GROUPS: ${MAI_ALLOWED_GROUPS:-}
-      MAI_MAX_REPLY_LENGTH: ${MAI_MAX_REPLY_LENGTH:-1500}
       OBSERVABILITY_QUEUE_CAPACITY: ${OBSERVABILITY_QUEUE_CAPACITY:-2048}
       OBSERVABILITY_BATCH_SIZE: ${OBSERVABILITY_BATCH_SIZE:-50}
       OBSERVABILITY_FLUSH_INTERVAL_SECONDS: ${OBSERVABILITY_FLUSH_INTERVAL_SECONDS:-0.5}
@@ -105,38 +98,8 @@ services:
     networks:
       - qqbot_network
 
-  # 麦麦 MaiBot（headless LLM agent，可选能力）：经 maim_message 由 nonebot 桥接接入，
-  # 不直连 QQ。启用：COMPOSE_PROFILES=qq,mai（且 MAI_ENABLED=true）。
-  # 镜像默认值已固定版本；升级时用 MAI_IMAGE 覆盖为新 tag（不要用 latest 漂浮）。
-  mai:
-    image: ${MAI_IMAGE:-sengokucola/maibot:1.2.3}
-    profiles: ["mai"]
-    environment:
-      TZ: ${TZ:-Asia/Shanghai}
-      EULA_AGREE: 8e6e7d647f7f82d6ea98456b73908656
-      PRIVACY_AGREE: 91e5db7659c560bc3545e63859b6ebc0
-      MAIBOT_LEGACY_0X_UPGRADE_CONFIRMED: "1"
-      WEBUI_HOST: 0.0.0.0
-    volumes:
-      - ./maibot/config:/MaiMBot/config
-      - mai_data:/MaiMBot/data
-    expose:
-      - "8000"
-      - "8001"
-    networks:
-      - qqbot_network
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
-        max-file: "5"
-
 volumes:
   mysql_data:
-  mai_data:
 
 networks:
   qqbot_network:

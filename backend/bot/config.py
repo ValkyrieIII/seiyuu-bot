@@ -38,17 +38,6 @@ class Settings(BaseSettings):
     observability_retention_interval_hours: int = 24
     observability_system_sample_seconds: float = 5.0
 
-    # MaiBot (麦麦) 桥接
-    mai_enabled: bool = False
-    # maim_message 0.6.x 客户端按原始 URL 连接，不会自动补路径；服务端路由挂在 /ws
-    mai_ws_url: str = "ws://mai:8000/ws"
-    mai_platform_name: str = "qqbot"
-    mai_auth_token: str = ""
-    # 逗号分隔的群号白名单；留空表示允许所有群
-    mai_allowed_groups: str = ""
-    # 麦麦回复的发送节奏由麦麦自身聊天频率控制，桥接层不再做限速拦截
-    mai_max_reply_length: int = 1500
-
     model_config = ConfigDict(
         env_file=".env",
         case_sensitive=False,
