@@ -2,8 +2,8 @@
 # 使用：复制为 bot_config.toml（部署机 maibot/config/bot_config.toml），按需修改。
 # 完整字段见官方仓库 src/config/official_configs.py；首启若缺失会自动生成默认配置。
 
-# 关闭 WebUI 对外的绝对必要性说明：WEBUI_HOST 已由 compose 环境变量设为 0.0.0.0，
-# 生产环境默认不映射 8001 端口到宿主机，如需访问请走 SSH 隧道或临时放行。
+# WEBUI_HOST 已由 compose 环境变量设为 0.0.0.0；生产环境将 8001 映射到宿主机
+# 127.0.0.1:${MAI_WEBUI_PORT:-18001}（仅本机），远程访问走 SSH/VS Code 端口转发，勿改公网暴露。
 
 [maim_message]
 # Legacy WS server —— qqbot 的 mai_bridge 插件以 MessageClient 身份连入此端口

@@ -47,8 +47,8 @@ QQ ──NapCat──> nonebot
    docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml up -d
    ```
 
-4. 首次启动后建议访问麦麦 WebUI（仅内网 `mai:8001`，需要临时映射端口或 SSH 隧道）
-   完成人设初始化与行为微调。
+4. 首次启动后建议访问麦麦 WebUI 完成人设初始化与行为微调。生产环境将 8001 映射到
+   宿主机 `127.0.0.1:${MAI_WEBUI_PORT:-18001}`（仅本机），远程访问走 SSH/VS Code 端口转发。
 
 ### 生产环境专项说明
 

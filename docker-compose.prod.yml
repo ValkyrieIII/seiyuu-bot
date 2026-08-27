@@ -32,6 +32,12 @@ services:
         max-size: 10m
         max-file: "5"
 
+  # 麦麦 WebUI 端口映射：默认仅绑定宿主机环回口，远程访问走 SSH/VS Code 端口转发。
+  # 如改 MAI_WEBUI_BIND_IP=0.0.0.0 会公网暴露管理面，不建议。
+  mai:
+    ports:
+      - "${MAI_WEBUI_BIND_IP:-127.0.0.1}:${MAI_WEBUI_PORT:-18001}:8001"
+
   frontend:
     image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE is required in production}
     build: null
