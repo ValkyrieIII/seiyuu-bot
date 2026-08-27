@@ -40,7 +40,8 @@ class Settings(BaseSettings):
 
     # MaiBot (麦麦) 桥接
     mai_enabled: bool = False
-    mai_ws_url: str = "ws://mai:8000"
+    # maim_message 0.6.x 客户端按原始 URL 连接，不会自动补路径；服务端路由挂在 /ws
+    mai_ws_url: str = "ws://mai:8000/ws"
     mai_platform_name: str = "qqbot"
     mai_auth_token: str = ""
     # 逗号分隔的群号白名单；留空表示允许所有群

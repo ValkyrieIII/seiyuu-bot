@@ -91,8 +91,16 @@ class MaiBridgeClient:
         return self._connected.is_set()
 
     async def _run_loop(self) -> None:
+        """守护循环：单实例终身制。
+
+        注意：maim_message 0.6.x 的 Router 自带断线自动重连，且旧连接实例无法从全局
+        注册表中彻底移除——若在外层轮询中反复新建 MessageClient，新旧两套重连逻辑会
+        互踢形成连接风暴（平台槽位唯一，双方不断顶掉对方）。因此这里只在首次建立连接，
+        之后完全信任库内自愈；仅当 run 任务彻底退出时才整体重建客户端。
+        """
         backoff = self._reconnect_min
         while not self._stopped:
+            client: Optional[MessageClient] = None
             try:
                 client = MessageClient(mode="ws")
                 client.register_message_handler(self._dispatch)
@@ -100,22 +108,28 @@ class MaiBridgeClient:
                 self._client = client
                 logger.info("已连接麦麦 maim_message 服务: {} (platform={})", self._ws_url, self._platform)
                 backoff = self._reconnect_min
-                run_task = asyncio.create_task(client.run(), name="mai_bridge.client_run")
-
-                # client.run() 正常情况下常驻；用轮询检测断线（库未暴露 disconnect 回调）
-                while not self._stopped and run_task.done() is False and client.is_connected():
-                    await asyncio.sleep(1.0)
-
-                if run_task.done() and run_task.exception() is not None:
-                    raise run_task.exception()  # type: ignore[misc]
-
-                if not self._stopped:
-                    logger.warning("与麦麦的连接已断开，准备重连")
+                # 常驻运行；瞬时断线由库内部自动重连，run 正常情况下永不返回
+                run_task = asyncio.ensure_future(client.run())
+                await asyncio.shield(run_task)
+                # run 返回（非异常）视为致命态，走外层重建
+                raise RuntimeError("maim_message 客户端运行循环意外退出")
             except asyncio.CancelledError:
+                if client is not None:
+                    try:
+                        await client.stop()
+                    except Exception:
+                        pass
                 return
             except Exception as exc:
-                logger.warning("麦麦桥接异常: {}，{}秒后重试", exc, backoff)
+                logger.warning("麦麦桥接异常: {}，{}秒后重建客户端", exc, backoff)
 
+            # 重建前尽力清理旧实例，避免残留连接器参与平台竞争
+            if client is not None:
+                try:
+                    await client.stop()
+                except Exception:
+                    pass
+            self._client = None
             self._connected.clear()
             if self._stopped:
                 return
