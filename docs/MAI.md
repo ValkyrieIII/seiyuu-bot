@@ -13,7 +13,7 @@ QQ ──NapCat──> nonebot
                 └─ p60 mai_bridge
                      ├─ 转发所有群文本（自身发言/功能命令除外）
                      │    └── maim_message ──> mai 容器（headless MaiBot）
-                     └─ 收到麦麦回复 ──OneBot──> 发回群（限速+白名单+观测）
+                     └─ 收到麦麦回复 ──OneBot──> 发回群（白名单+观测）
 ```
 
 为什么不是把 NapCat 直连给两套 bot：一个 QQ 号同一时刻只能有一个"意识所有者"，
@@ -72,7 +72,7 @@ deploy.sh 只更新 nonebot/frontend，**永远不会拉起或触碰 mai 容器*
 | 机器人自己的消息永不外传 | `should_forward(is_self)` —— 切断自循环 |
 | @机器人 "签到/声优列表" 不进麦麦语境 | 归 mention_command 车道 |
 | 其他一切群文本（含命中别名的）都作为上下文外传 | 麦麦自主决定是否插话 |
-| 出站最小间隔 | `MAI_MIN_INTERVAL_SECONDS`（默认 10s），间隔内的回复直接丢弃 |
+| 发送节奏 | 由麦麦自身聊天频率控制，桥接层不拦截（历史内置限速器已移除，曾导致多段回复被静默吞掉） |
 | 回复长度上限 | `MAI_MAX_REPLY_LENGTH`（默认 1500 字符截断） |
 | 群范围 | `MAI_ALLOWED_GROUPS` 逗号分隔白名单，空=全部（同时约束出入站） |
 
@@ -82,7 +82,6 @@ deploy.sh 只更新 nonebot/frontend，**永远不会拉起或触碰 mai 容器*
 
 - `success`：麦麦回复成功投递
 - `error/MAI_DELIVER_FAILED`：OneBot 发送失败
-- `error/RATE_LIMITED`：触发限速被丢弃
 - `error/GROUP_NOT_ALLOWED`：目标群不在白名单
 
 可在 admin 后台概览页查看请求量与成功率。

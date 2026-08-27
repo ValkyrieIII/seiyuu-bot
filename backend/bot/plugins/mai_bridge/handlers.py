@@ -13,7 +13,6 @@ from bot.observability import elapsed_ms, record_event
 
 from .client import MaiBridgeClient, get_instance, set_instance
 from .router import (
-    ReplyRateLimiter,
     flatten_segments,
     parse_group_allowlist,
     should_forward,
@@ -22,7 +21,6 @@ from .router import (
 
 _matcher = on_message(priority=60, block=False)
 
-_rate_limiter = ReplyRateLimiter(settings.mai_min_interval_seconds)
 _allowlist = parse_group_allowlist(settings.mai_allowed_groups)
 # 群名缓存：麦麦 v1.2.x 要求入站消息的 group_info.group_name 必须为字符串，
 # 取不到真实名称时用"群<id>"兑底
@@ -85,19 +83,6 @@ async def _deliver_reply(payload: dict) -> None:
             group_id=group_id,
             started_ns=started_ns,
             error_code="GROUP_NOT_ALLOWED",
-        )
-        return
-
-    ok, elapsed_seconds = _rate_limiter.try_acquire()
-    if not ok:
-        logger.debug(
-            "麦麦回复触发限速被丢弃: group_id={} 距上次{:.1f}s", group_id, elapsed_seconds
-        )
-        _record_outbound(
-            status="error",
-            group_id=group_id,
-            started_ns=started_ns,
-            error_code="RATE_LIMITED",
         )
         return
 

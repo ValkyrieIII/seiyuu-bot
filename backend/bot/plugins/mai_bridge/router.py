@@ -50,27 +50,6 @@ def should_forward(
     return True, "ok"
 
 
-class ReplyRateLimiter:
-    """最小间隔限速器：间隔内到达的第二条回复直接丢弃（防刷屏优于排队延迟）。"""
-
-    def __init__(self, min_interval_seconds: float):
-        self._min_interval = max(0.0, float(min_interval_seconds))
-        self._last_ts: Optional[float] = None
-
-    def try_acquire(self, *, now: Optional[float] = None) -> Tuple[bool, float]:
-        """尝试获取发送权。
-
-        Returns:
-            (是否放行, 距上次发送的秒数；首次为 0.0)
-        """
-        ts = time.monotonic() if now is None else now
-        elapsed = 0.0 if self._last_ts is None else ts - self._last_ts
-        if self._last_ts is not None and elapsed < self._min_interval:
-            return False, elapsed
-        self._last_ts = ts
-        return True, elapsed
-
-
 def truncate_reply(text: str, max_length: int) -> str:
     """按长度上限截断回复文本。"""
     limit = max(1, int(max_length))

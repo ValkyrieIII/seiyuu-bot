@@ -1,4 +1,4 @@
-"""mai_bridge 纯逻辑单测：转发决策 / 限速器 / 段拍平。"""
+"""mai_bridge 纯逻辑单测：转发决策 / 段拍平。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,6 @@ BACKEND_ROOT = PROJECT_ROOT / "backend"
 sys.path.insert(0, str(BACKEND_ROOT))
 
 from bot.plugins.mai_bridge.router import (
-    ReplyRateLimiter,
     flatten_segments,
     parse_group_allowlist,
     should_forward,
@@ -88,31 +87,6 @@ class TestShouldForward:
             allowlist=self.ALLOW,
         )
         assert ok and reason == "ok"
-
-
-class TestReplyRateLimiter:
-    def test_first_reply_always_passes(self):
-        limiter = ReplyRateLimiter(min_interval_seconds=10.0)
-        ok, elapsed = limiter.try_acquire(now=100.0)
-        assert ok and elapsed == 0.0
-
-    def test_second_reply_within_interval_dropped(self):
-        limiter = ReplyRateLimiter(min_interval_seconds=10.0)
-        limiter.try_acquire(now=100.0)
-        ok, elapsed = limiter.try_acquire(now=105.0)
-        assert not ok
-        assert elapsed == pytest.approx(5.0)
-
-    def test_after_interval_passes_again(self):
-        limiter = ReplyRateLimiter(min_interval_seconds=10.0)
-        limiter.try_acquire(now=100.0)
-        ok, _ = limiter.try_acquire(now=110.5)
-        assert ok
-
-    def test_zero_interval_disables_limiting(self):
-        limiter = ReplyRateLimiter(min_interval_seconds=0.0)
-        assert limiter.try_acquire(now=0.0)[0]
-        assert limiter.try_acquire(now=0.01)[0]
 
 
 class TestTruncateAndFlatten:
