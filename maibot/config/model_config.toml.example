@@ -1,10 +1,13 @@
-# 麦麦 model_config.toml 模板
+# 麦麦 model_config.toml 模板 —— 按 MaiMBot v1.2.3 schema 编写。
+# 注意：v1.2.3 顶层键为复数的 api_providers / models（旧版 [[api_provider]]/[[model]] 单数键不被识别，
+#       会导致 "模型列表不能为空" 启动失败）；且必须带 [inner] version 段。
 # 使用：复制为 model_config.toml 并把 api_key 替换为你的 DeepSeek Key。
 # 此文件包含密钥，绝不能提交进版本库（.gitignore 已忽略）。
-# 说明：v1.2.3 默认模板即为 DeepSeek；这里显式写出全部任务指向 deepseek-v4-flash，
-#       若想让回复更有深度，可把 replyer.model_list 改为 ["deepseek-v4-pro-think"] 等。
 
-[[api_provider]]
+[inner]
+version = "1.2.3"
+
+[[api_providers]]
 name = "DeepSeek"
 base_url = "https://api.deepseek.com"
 api_key = "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
@@ -13,7 +16,7 @@ max_retry = 3
 timeout = 100
 retry_interval = 8
 
-[[model]]
+[[models]]
 model_identifier = "deepseek-v4-flash"
 name = "deepseek-v4-flash"
 api_provider = "DeepSeek"
