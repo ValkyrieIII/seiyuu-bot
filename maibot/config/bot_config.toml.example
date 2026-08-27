@@ -1,0 +1,22 @@
+# 麦麦 bot_config.toml 模板
+# 使用：复制为 bot_config.toml（部署机 maibot/config/bot_config.toml），按需修改。
+# 完整字段见官方仓库 src/config/official_configs.py；首启若缺失会自动生成默认配置。
+
+# 关闭 WebUI 对外的绝对必要性说明：WEBUI_HOST 已由 compose 环境变量设为 0.0.0.0，
+# 生产环境默认不映射 8001 端口到宿主机，如需访问请走 SSH 隧道或临时放行。
+
+[maim_message]
+# Legacy WS server —— qqbot 的 mai_bridge 插件以 MessageClient 身份连入此端口
+ws_server_host = "0.0.0.0"
+ws_server_port = 8000
+# 与 nonebot 侧 MAI_AUTH_TOKEN 保持一致；留空表示不鉴权（不建议）
+auth_token = ["change-me-bridge-token"]
+
+# 新版 API Server 无需开启（桥接走 legacy 协议）
+enable_api_server = false
+
+# 内网桥接拓扑中，麦麦不直接连接 QQ，无需配置 NapCat 相关项
+
+[chat]
+# 群聊回复意愿等行为参数保持官方默认即可；
+# 想让麦麦更活跃/更沉默可微调 replyer 相关概率配置（详见官方文档）

@@ -1,0 +1,62 @@
+# 麦麦 model_config.toml 模板
+# 使用：复制为 model_config.toml 并把 api_key 替换为你的 DeepSeek Key。
+# 此文件包含密钥，绝不能提交进版本库（.gitignore 已忽略）。
+# 说明：v1.2.3 默认模板即为 DeepSeek；这里显式写出全部任务指向 deepseek-v4-flash，
+#       若想让回复更有深度，可把 replyer.model_list 改为 ["deepseek-v4-pro-think"] 等。
+
+[[api_provider]]
+name = "DeepSeek"
+base_url = "https://api.deepseek.com"
+api_key = "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
+auth_type = "bearer"
+max_retry = 3
+timeout = 100
+retry_interval = 8
+
+[[model]]
+model_identifier = "deepseek-v4-flash"
+name = "deepseek-v4-flash"
+api_provider = "DeepSeek"
+price_in = 1.0
+price_out = 2.0
+visual = false
+extra_params = { thinking = { type = "disabled" } }
+
+[model_task_config.utils]
+model_list = ["deepseek-v4-flash"]
+max_tokens = 4096
+temperature = 0.5
+
+[model_task_config.replyer]
+model_list = ["deepseek-v4-flash"]
+max_tokens = 4096
+temperature = 1.0
+
+[model_task_config.planner]
+model_list = ["deepseek-v4-flash"]
+max_tokens = 8000
+temperature = 0.7
+
+[model_task_config.memory]
+model_list = ["deepseek-v4-flash"]
+
+[model_task_config.mid_memory]
+model_list = ["deepseek-v4-flash"]
+
+[model_task_config.expression_use]
+model_list = ["deepseek-v4-flash"]
+
+[model_task_config.emoji]
+model_list = ["deepseek-v4-flash"]
+
+[model_task_config.vlm]
+model_list = []
+
+[model_task_config.voice]
+model_list = []
+
+[model_task_config.embedding]
+model_list = []
+
+[model_task_config.learner]
+model_list = ["deepseek-v4-flash"]

@@ -98,8 +98,30 @@ services:
     networks:
       - qqbot_network
 
+  # 麦麦 MaiBot（headless LLM agent，可选能力）：经 maim_message 由 nonebot 桥接接入，
+  # 不直连 QQ。启用：COMPOSE_PROFILES=qq,mai（且 MAI_ENABLED=true）。
+  mai:
+    image: ${MAI_IMAGE:-sengokucola/maibot:v1.2.3}
+    profiles: ["mai"]
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      EULA_AGREE: 8e6e7d647f7f82d6ea98456b73908656
+      PRIVACY_AGREE: 91e5db7659c560bc3545e63859b6ebc0
+      MAIBOT_LEGACY_0X_UPGRADE_CONFIRMED: "1"
+      WEBUI_HOST: 0.0.0.0
+    volumes:
+      - ./maibot/config:/MaiMBot/config
+      - mai_data:/MaiMBot/data
+    expose:
+      - "8000"
+      - "8001"
+    networks:
+      - qqbot_network
+    restart: unless-stopped
+
 volumes:
   mysql_data:
+  mai_data:
 
 networks:
   qqbot_network:

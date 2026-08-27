@@ -6,6 +6,7 @@
 - 支持 @机器人 命令：签到、声优列表
 - 提供管理后台（/admin）进行声优、别名和图片同步管理
 - 支持图片目录变更自动监听与数据库增量同步
+- 可选接入 [MaiBot（麦麦）](https://github.com/Mai-with-u/MaiBot) 作为群聊 LLM 闲聊大脑（见 [docs/MAI.md](docs/MAI.md)）
 
 ## 技术栈
 

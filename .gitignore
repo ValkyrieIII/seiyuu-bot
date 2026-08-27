@@ -75,3 +75,7 @@ docs/superpowers/
 
 # pnpm store（docker 挂载构建产生的缓存）
 .pnpm-store/
+
+# MaiBot 配置（model_config.toml 含 LLM API Key，不进版本库）
+maibot/config/*
+!maibot/config/*.example
