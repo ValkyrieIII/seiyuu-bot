@@ -38,6 +38,20 @@ class Settings(BaseSettings):
     observability_retention_interval_hours: int = 24
     observability_system_sample_seconds: float = 5.0
 
+    # MaiBot (麦麦) 桥接
+    mai_enabled: bool = False
+    mai_ws_url: str = "ws://mai:8000"
+    mai_platform_name: str = "qqbot"
+    mai_auth_token: str = ""
+    # 逗号分隔的群号白名单；留空表示允许所有群
+    mai_allowed_groups: str = ""
+    # 麦麦出站回复之间的最小间隔（秒），防止刷屏
+    mai_min_interval_seconds: float = 10.0
+    # 单条回复文本长度上限（超出截断），防止长篇大论
+    mai_max_reply_length: int = 1500
+    # 出站发送队列上限，超过即丢弃最旧回复
+    mai_outbound_queue_size: int = 32
+
     model_config = ConfigDict(
         env_file=".env",
         case_sensitive=False,
