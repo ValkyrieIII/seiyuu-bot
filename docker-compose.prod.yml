@@ -63,18 +63,5 @@ services:
         max-size: 10m
         max-file: "5"
 
-  mai:
-    image: ${MAI_IMAGE:?MAI_IMAGE must be pinned when the mai profile is enabled}
-    environment:
-      LOG_LEVEL: ERROR
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    logging:
-      driver: json-file
-      options:
-        max-size: 10m
-        max-file: "5"
-
 volumes:
   napcat_data:
