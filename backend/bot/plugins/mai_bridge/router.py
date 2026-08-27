@@ -99,6 +99,13 @@ def flatten_segments(segment: dict) -> Tuple[str, bool]:
                     parts.append(child_text)
         return "".join(parts), has_image
 
+    # 麦麦 v1.2.x 出站组件：
+    # - reply.data 是被回复的消息 ID（OneBot message_id），不属于正文
+    # - at.data 是目标用户 ID（无昵称，正文里通常已有称呼），渲染成裸数字只会污染消息
+    # 两者一律剥离；如需真正的引用回复/At 效果需接入 additional_config 定向字段，后续再做
+    if seg_type in ("reply", "at"):
+        return "", False
+
     if seg_type == "image":
         return "[图片]", True
 

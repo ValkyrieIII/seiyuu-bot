@@ -149,3 +149,20 @@ class TestTruncateAndFlatten:
     def test_flatten_unknown_type_returns_empty(self):
         text, has_image = flatten_segments({"type": "mystery", "data": None})
         assert text == "" and not has_image
+
+    def test_flatten_reply_segment_stripped(self):
+        """reply.data 是被回复的消息 ID，不属于正文。"""
+        text, has_image = flatten_segments({"type": "reply", "data": "185498843"})
+        assert text == "" and not has_image
+
+    def test_flatten_at_segment_stripped(self):
+        """at.data 是目标用户 ID，无昵称可渲染，直接剥离。"""
+        seg = {
+            "type": "seglist",
+            "data": [
+                {"type": "at", "data": "2717098884"},
+                {"type": "text", "data": "别慌"},
+            ],
+        }
+        text, has_image = flatten_segments(seg)
+        assert text == "别慌" and not has_image
