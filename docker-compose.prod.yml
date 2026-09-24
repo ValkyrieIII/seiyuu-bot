@@ -49,11 +49,16 @@ services:
 
   napcat:
     image: ${NAPCAT_IMAGE:?NAPCAT_IMAGE must be pinned in production}
+    environment:
+      # 快速登录：entrypoint 以 `-q $ACCOUNT` 启动 QQ，登录票据持久化在 napcat_qq_config 卷
+      ACCOUNT: ${BOT_QQ:?BOT_QQ is required in production}
     ports:
       - "${NAPCAT_BIND_IP:-127.0.0.1}:${NAPCAT_ADMIN_PORT:-3000}:3000"
       - "${NAPCAT_BIND_IP:-127.0.0.1}:${NAPCAT_WEBUI_PORT:-6099}:6099"
     volumes:
       - napcat_data:/opt/napcat/data
+      - napcat_config:/app/napcat/config
+      - napcat_qq_config:/app/.config/QQ
       - ${IMAGES_PATH:-./images}:/app/images
     restart: unless-stopped
     security_opt:
@@ -66,3 +71,5 @@ services:
 
 volumes:
   napcat_data:
+  napcat_config:
+  napcat_qq_config:
