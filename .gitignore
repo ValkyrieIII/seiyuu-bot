@@ -79,3 +79,7 @@ docs/superpowers/
 # MaiBot 配置（model_config.toml 含 LLM API Key，不进版本库）
 maibot/config/*
 !maibot/config/*.example
+
+#副产物
+reports/
+backups/
