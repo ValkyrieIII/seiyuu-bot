@@ -15,10 +15,9 @@ from loguru import logger
 from sqlalchemy import func
 
 from bot.config import settings
-from bot.plugins.voice_actor.services import invalidate_known_names
 from .schemas import AliasCreate, VoiceActorCreate, VoiceActorUpdate, ImageUpdate
 
-# voice_actor 模型/工具延迟导入，避免在 NoneBot 插件加载前 import 导致插件注册失败
+# voice_actor 模型/工具/服务延迟导入，避免在 NoneBot 插件加载前 import 导致插件注册失败
 # 实际导入在 register_admin_routes() 内部完成
 
 
@@ -50,6 +49,7 @@ def register_admin_routes(driver) -> None:
         VoiceActor,
         get_session,
     )
+    from bot.plugins.voice_actor.services import invalidate_known_names
     from bot.plugins.voice_actor.utils import scan_image_records
 
     # 管理后台统一前缀，便于反向代理和权限隔离
