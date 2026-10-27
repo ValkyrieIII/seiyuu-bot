@@ -145,7 +145,9 @@ export interface DependencyReadiness {
 export interface ReadinessData {
   ready: boolean
   database: DependencyReadiness
-  onebot: DependencyReadiness & { connected_bots: number }
+  platform: 'onebot' | 'qq_official'
+  connection: DependencyReadiness & { connected_bots: number }
+  onebot?: DependencyReadiness & { connected_bots: number }
 }
 
 // ---------- 请求参数与辅助类型 ----------

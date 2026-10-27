@@ -6,6 +6,7 @@ from datetime import date
 from typing import Tuple, Optional
 from loguru import logger
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from .models import CheckIn, get_session
 
 
@@ -55,7 +56,24 @@ class CheckInService:
                 lucky_image_id=lucky_image_id,
             )
             session.add(record)
-            session.commit()
+            try:
+                session.commit()
+            except IntegrityError:
+                # 同一用户的并发签到可能同时通过查询，唯一索引决定最终记录。
+                session.rollback()
+                existing = (
+                    session.query(CheckIn)
+                    .filter(CheckIn.user_id == user_id, CheckIn.check_in_date == today)
+                    .first()
+                )
+                if existing is None:
+                    raise
+                total = (
+                    session.query(func.count(CheckIn.id))
+                    .filter(CheckIn.user_id == user_id)
+                    .scalar()
+                )
+                return False, total, existing.lucky_actor_id, existing.lucky_image_id
 
             total_after = total + 1
             logger.info(

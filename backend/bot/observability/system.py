@@ -149,15 +149,48 @@ def check_onebot(get_bots: Optional[Callable] = None) -> Dict[str, Any]:
 
 async def readiness(
     database_check: Callable = check_database,
-    onebot_check: Callable = check_onebot,
+    onebot_check: Optional[Callable] = None,
 ) -> Dict[str, Any]:
     database = await asyncio.to_thread(database_check)
-    onebot = onebot_check()
-    return {
-        "ready": bool(database["ready"] and onebot["ready"]),
+    if onebot_check is not None:
+        connection = onebot_check()
+    elif settings.bot_platform == "qq_official":
+        connection = check_official_qq()
+    else:
+        connection = check_onebot()
+    result = {
+        "ready": bool(database["ready"] and connection["ready"]),
         "database": database,
-        "onebot": onebot,
+        "platform": settings.bot_platform,
+        "connection": connection,
     }
+    # 兼容已有管理端，官方模式不伪装成 OneBot 状态。
+    if settings.bot_platform == "onebot":
+        result["onebot"] = connection
+    return result
+
+
+def check_official_qq(get_bots: Optional[Callable] = None) -> Dict[str, Any]:
+    try:
+        if get_bots is None:
+            import nonebot
+
+            get_bots = nonebot.get_bots
+        bots = get_bots()
+        expected = settings.qq_app_id.strip()
+        ready = bool(expected) and expected in {str(bot_id) for bot_id in bots}
+        return {
+            "ready": ready,
+            "error_code": None if ready else "QQ_OFFICIAL_DISCONNECTED",
+            "connected_bots": len(bots),
+        }
+    except Exception:
+        logger.opt(exception=True).warning("readiness 官方 QQ 检查失败")
+        return {
+            "ready": False,
+            "error_code": "QQ_OFFICIAL_CHECK_FAILED",
+            "connected_bots": 0,
+        }
 
 
 _sampler = SystemSampler(settings.observability_system_sample_seconds)

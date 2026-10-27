@@ -13,9 +13,9 @@ services:
     environment:
       APP_ENV: production
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      NONEBOT_ADAPTER_ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:?ONEBOT_ACCESS_TOKEN is required in production}
-      ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:?ONEBOT_ACCESS_TOKEN is required in production}
-      BOT_QQ: ${BOT_QQ:?BOT_QQ is required in production}
+      NONEBOT_ADAPTER_ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:-}
+      ONEBOT_ACCESS_TOKEN: ${ONEBOT_ACCESS_TOKEN:-}
+      BOT_QQ: ${BOT_QQ:-}
       GRAB_TARGET_QQ: ${GRAB_TARGET_QQ:-}
     volumes:
       - ${IMAGES_PATH:-./images}:/app/images
@@ -48,10 +48,10 @@ services:
         max-file: "5"
 
   napcat:
-    image: ${NAPCAT_IMAGE:?NAPCAT_IMAGE must be pinned in production}
+    image: ${NAPCAT_IMAGE:-invalid.local/napcat-image-must-be-pinned:missing}
     environment:
       # 快速登录：entrypoint 以 `-q $ACCOUNT` 启动 QQ，登录票据持久化在 napcat_qq_config 卷
-      ACCOUNT: ${BOT_QQ:?BOT_QQ is required in production}
+      ACCOUNT: ${BOT_QQ:-}
     ports:
       - "${NAPCAT_BIND_IP:-127.0.0.1}:${NAPCAT_ADMIN_PORT:-3000}:3000"
       - "${NAPCAT_BIND_IP:-127.0.0.1}:${NAPCAT_WEBUI_PORT:-6099}:6099"

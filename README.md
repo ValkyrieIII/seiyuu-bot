@@ -10,7 +10,7 @@
 
 ## 技术栈
 
-- Python 3.9+
+- Python 3.10+
 - NoneBot2 + nonebot-adapter-onebot
 - FastAPI（NoneBot 驱动层）
 - SQLAlchemy + PyMySQL

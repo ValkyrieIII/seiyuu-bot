@@ -1,3 +1,13 @@
+-- 官方身份使用负整数映射，旧 QQ 数字身份保持正数。
+CREATE TABLE IF NOT EXISTS qq_official_identities (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    identity_key VARCHAR(64) NOT NULL UNIQUE,
+    app_id VARCHAR(128) NOT NULL,
+    kind VARCHAR(16) NOT NULL,
+    group_openid VARCHAR(512) NOT NULL,
+    openid VARCHAR(512) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='官方 QQ 身份映射表';
+
 -- 声优表
 CREATE TABLE IF NOT EXISTS voice_actors (
     id INT PRIMARY KEY AUTO_INCREMENT COMMENT '声优ID',

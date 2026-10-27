@@ -127,6 +127,7 @@ def show_help():
     print("  sync-database               等同 scan-images-db（兼容旧命令）")
     print("  reset-checkins              清空签到表所有记录")
     print("  migrate-observability       显式迁移统计表（执行前必须备份数据库）")
+    print("  migrate-qq-identities       显式创建官方 QQ 身份映射表（执行前必须备份数据库）")
     print("  help                        显示此帮助信息")
     print()
 
@@ -210,6 +211,24 @@ def main():
         if disabled_images > 0:
             print(f"✗ 禁用图片: {disabled_images}")
         print("=" * 60)
+        sys.exit(0)
+
+    elif command == "migrate-qq-identities":
+        print("⚠️  请先对生产数据库执行并验证备份。")
+        if "--yes" not in sys.argv[2:]:
+            confirmed = input("确认已完成备份并继续？[y/N]: ").strip().lower()
+            if confirmed not in {"y", "yes"}:
+                print("已取消，数据库未修改。")
+                sys.exit(1)
+        from bot.identity import migrate_qq_identities
+
+        try:
+            actions = migrate_qq_identities()
+        except Exception as exc:
+            logger.error("官方身份迁移失败: {}", exc)
+            print(f"❌ 迁移失败: {exc}")
+            sys.exit(1)
+        print("✅ " + (", ".join(actions) if actions else "数据库已是目标结构，无需修改。"))
         sys.exit(0)
 
     elif command == "migrate-observability":

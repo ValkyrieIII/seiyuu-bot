@@ -9,7 +9,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1] / "backend"
 sys.path.insert(0, str(BACKEND_ROOT))
 
 from bot.observability.migration import request_log_migration_plan
-from bot.observability.system import check_database, check_onebot, readiness
+from bot.observability.system import check_database, check_onebot, check_official_qq, readiness
 
 
 def test_migration_plan_is_empty_after_target_schema_exists():
@@ -53,3 +53,19 @@ def test_readiness_degrades_independently_for_database_and_onebot():
     assert database_down["onebot"]["ready"] is True
     assert onebot_down["ready"] is False
     assert onebot_down["database"]["ready"] is True
+
+
+def test_official_readiness_uses_official_bot_id(monkeypatch):
+    from bot.observability.system import settings
+
+    monkeypatch.setattr(settings, "bot_platform", "qq_official")
+    monkeypatch.setattr(settings, "qq_app_id", "official-app")
+    assert check_official_qq(lambda: {"official-app": object()})["ready"] is True
+    assert check_official_qq(lambda: {"different-app": object()})["error_code"] == "QQ_OFFICIAL_DISCONNECTED"
+    result = asyncio.run(readiness(
+        database_check=lambda: {"ready": True, "error_code": None},
+        onebot_check=lambda: check_official_qq(lambda: {"official-app": object()}),
+    ))
+    assert result["platform"] == "qq_official"
+    assert result["connection"]["ready"] is True
+    assert "onebot" not in result

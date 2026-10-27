@@ -45,9 +45,14 @@ class ObservabilityEvent:
             raise ValueError("command must be a stable snake_case identifier")
         if self.status not in VALID_STATUSES:
             raise ValueError(f"unsupported status: {self.status}")
-        if not isinstance(self.user_id, int) or isinstance(self.user_id, bool) or self.user_id <= 0:
-            raise ValueError("user_id must be a positive integer")
-        for field_name in ("group_id", "voice_actor_id", "image_id"):
+        # 正数是旧 QQ 身份，负数是官方身份映射；零不属于任何身份。
+        if not isinstance(self.user_id, int) or isinstance(self.user_id, bool) or self.user_id == 0:
+            raise ValueError("user_id must be a non-zero integer")
+        if self.group_id is not None and (
+            not isinstance(self.group_id, int) or isinstance(self.group_id, bool) or self.group_id == 0
+        ):
+            raise ValueError("group_id must be a non-zero integer or None")
+        for field_name in ("voice_actor_id", "image_id"):
             value = getattr(self, field_name)
             if value is not None and (
                 not isinstance(value, int) or isinstance(value, bool) or value <= 0

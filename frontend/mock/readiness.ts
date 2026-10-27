@@ -8,5 +8,7 @@ export default [{
     ready: true,
     database: { ready: true, error_code: null },
     onebot: { ready: true, error_code: null, connected_bots: 1 },
+    platform: 'onebot',
+    connection: { ready: true, error_code: null, connected_bots: 1 },
   }),
 }] satisfies MockMethod[]

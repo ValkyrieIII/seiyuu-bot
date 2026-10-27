@@ -52,30 +52,39 @@ logger.add(
     level=settings.log_level,
 )
 
-os.environ.setdefault("DRIVER", "~fastapi")
+os.environ.setdefault(
+    "DRIVER", "~fastapi+~aiohttp" if settings.bot_platform == "qq_official" else "~fastapi"
+)
 os.environ.setdefault("HOST", "0.0.0.0")
 os.environ.setdefault("PORT", "8080")
 os.environ.setdefault("NONEBOT_LOG_LEVEL", settings.log_level)
 
 listen_port = os.environ["PORT"]
-os.environ.setdefault(
-    "NONEBOT_ADAPTER_ONEBOT_WS_REVERSE_SERVERS",
-    json.dumps([f"0.0.0.0:{listen_port}"]),
-)
-os.environ.setdefault(
-    "NONEBOT_ADAPTER_ONEBOT_ACCESS_TOKEN",
-    settings.onebot_access_token,
-)
+if settings.bot_platform == "onebot":
+    os.environ.setdefault(
+        "NONEBOT_ADAPTER_ONEBOT_WS_REVERSE_SERVERS",
+        json.dumps([f"0.0.0.0:{listen_port}"]),
+    )
+    os.environ.setdefault("NONEBOT_ADAPTER_ONEBOT_ACCESS_TOKEN", settings.onebot_access_token)
+else:
+    if not settings.qq_app_id.strip() or not settings.qq_app_secret.strip():
+        raise ValueError("QQ_APP_ID and QQ_APP_SECRET are required for qq_official")
+    # 只订阅群和单聊事件，避免请求没有开通的频道权限。
+    os.environ["QQ_BOTS"] = json.dumps([{
+        "id": settings.qq_app_id.strip(),
+        "secret": settings.qq_app_secret,
+        "use_websocket": True,
+        "intent": {
+            "guilds": False, "guild_members": False,
+            "guild_message_reactions": False, "message_audit": False,
+            "at_messages": False, "c2c_group_at_messages": True,
+        },
+    }])
 
 logger.info(f"运行环境: {settings.app_env}")
-logger.info(f"OneBot 反向 WebSocket: 0.0.0.0:{listen_port}")
-logger.info(
-    "OneBot Access Token: {}",
-    "已配置" if settings.onebot_access_token else "未配置",
-)
+logger.info("机器人接入方式: {}", settings.bot_platform)
 
 import nonebot
-from nonebot.adapters.onebot.v11 import Adapter
 
 from bot.admin import register_admin_routes
 from bot.health import register_health_route
@@ -88,11 +97,19 @@ def main():
     logger.info(f"数据库: {settings.db_host}:{settings.db_port}/{settings.db_name}")
 
     try:
+        if settings.bot_platform == "qq_official":
+            from bot.identity import check_qq_identity_storage
+
+            check_qq_identity_storage()
         nonebot.init()
         driver = nonebot.get_driver()
 
         register_health_route(driver)
         register_observability_hooks(driver)
+        if settings.bot_platform == "onebot":
+            from nonebot.adapters.onebot.v11 import Adapter
+        else:
+            from nonebot.adapters.qq import Adapter
         driver.register_adapter(Adapter)
 
         nonebot.load_plugins("bot/plugins")

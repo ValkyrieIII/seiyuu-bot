@@ -32,7 +32,10 @@ services:
       DB_NAME: ${DB_NAME:?DB_NAME is required}
       DB_USER: ${DB_USER:?DB_USER is required}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
-      DRIVER: ${DRIVER:-~fastapi}
+      DRIVER: ${DRIVER:-~fastapi+~aiohttp}
+      BOT_PLATFORM: ${BOT_PLATFORM:-onebot}
+      QQ_APP_ID: ${QQ_APP_ID:-}
+      QQ_APP_SECRET: ${QQ_APP_SECRET:-}
       HOST: 0.0.0.0
       PORT: 8080
       LOG_LEVEL: ${LOG_LEVEL:-INFO}

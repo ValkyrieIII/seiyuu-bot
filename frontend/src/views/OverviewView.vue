@@ -186,7 +186,7 @@ onDeactivated(stopTimer)
         <el-card shadow="never" class="fill-card">
           <template #header><span class="card-title">就绪与统计队列</span></template>
           <div class="readiness-row"><span>数据库</span><el-tag :type="readiness?.database.ready ? 'success' : 'danger'">{{ readiness?.database.ready ? '可用' : '不可用' }}</el-tag></div>
-          <div class="readiness-row"><span>OneBot</span><el-tag :type="readiness?.onebot.ready ? 'success' : 'danger'">{{ readiness?.onebot.ready ? '已连接' : '未连接' }}</el-tag></div>
+          <div class="readiness-row"><span>{{ readiness?.platform === 'qq_official' ? 'QQ 官方机器人' : 'OneBot' }}</span><el-tag :type="readiness?.connection.ready ? 'success' : 'danger'">{{ readiness?.connection.ready ? '已连接' : '未连接' }}</el-tag></div>
           <el-divider />
           <div class="queue-grid">
             <div><strong>{{ metrics?.queue.backlog ?? 0 }}</strong><span>当前积压</span></div>

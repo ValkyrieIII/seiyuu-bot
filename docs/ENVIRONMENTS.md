@@ -101,15 +101,20 @@ cp .env.prod.example .env.prod
 chmod 600 .env.prod
 ```
 
-必须填写以下留空项后再启动；Compose 会拒绝缺少这些值的生产配置：
+必须填写以下留空项后再启动：
 
 - `DB_ROOT_PASSWORD`
 - `DB_PASSWORD`
-- `ONEBOT_ACCESS_TOKEN`
-- `BOT_QQ`
-- `NAPCAT_IMAGE`（填写经过验证的固定版本标签或镜像摘要）
 - `NONEBOT_IMAGE`（生产服务器当前使用的后端镜像与 tag）
 - `FRONTEND_IMAGE`（生产服务器当前使用的前端镜像与 tag）
+
+选择 `BOT_PLATFORM=onebot` 时还需要 `ONEBOT_ACCESS_TOKEN`、`BOT_QQ`；如启用内置 NapCat，还必须设置经验证的固定版本 `NAPCAT_IMAGE`。选择 `BOT_PLATFORM=qq_official` 时需要 `QQ_APP_ID`、`QQ_APP_SECRET`，并关闭 `qq` profile。应用启动时按接入方式校验凭据。
+
+官方接入使用 WebSocket，不需要配置公网回调。先在 QQ 开放平台创建机器人、配置群及单聊事件，并在测试群开启接收所有消息；配置不等于权限验证，必须实测免 @ 接收和图片回复。`DRIVER` 如需覆盖，必须同时包含 FastAPI、HTTP 客户端和 WebSocket 客户端，例如 `~fastapi+~aiohttp`。密钥只放在本机未跟踪的环境文件中。
+
+官方图片上传适配固定的 `nonebot-adapter-qq==1.7.3`，为补齐分片合并参数而使用了适配器的内部上传接口。升级适配器时必须重新检查上传实现，并在测试群回归直传、分片、文字与图片的组合回复。消息去重仅在单进程内有效，重启或多实例部署后不能保证去重。
+
+启用官方接入前，先备份数据库并验证备份，再使用与目标环境相同的数据库配置执行 `python -m bot.manage migrate-qq-identities`。该命令显式创建身份映射表；官方模式启动时只读检查迁移是否完成，不会自动修改数据库。旧签到记录继续保留，身份绑定规则尚未确定。官方群成员身份按机器人和群分别隔离，私聊身份也独立；同一人跨群或私聊的签到暂不合并。
 
 先验证合并后的 Compose 配置：
 
@@ -128,7 +133,7 @@ docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod
 
 默认前端入口绑定到宿主机 `127.0.0.1:80`；启用内置 NapCat 时，其管理端口也只绑定 `127.0.0.1`。MySQL 和 NoneBot 不直接对外开放。推荐在前端入口前部署 Caddy、Nginx 或云负载均衡负责 HTTPS。外部监控可请求前端入口的 `/health`。
 
-内置 NapCat 由 `.env.prod` 中的 `COMPOSE_PROFILES=qq` 启用。若 NapCat 部署在别处，删除该变量或留空，并让外置 NapCat 连接 `wss://你的域名/onebot/v11/ws`，访问令牌必须与 `ONEBOT_ACCESS_TOKEN` 一致。
+内置 NapCat 由 `.env.prod` 中的 `COMPOSE_PROFILES=qq` 启用。未设置 `NAPCAT_IMAGE` 时占位镜像不可用，不能启动 NapCat。若 NapCat 部署在别处，删除该变量或留空，并让外置 NapCat 连接 `wss://你的域名/onebot/v11/ws`，访问令牌必须与 `ONEBOT_ACCESS_TOKEN` 一致。
 
 查看状态和日志：
 

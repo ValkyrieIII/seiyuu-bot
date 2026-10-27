@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     """Load runtime settings from environment variables and an optional .env file."""
 
     app_env: Literal["development", "test", "production"] = "development"
+    bot_platform: Literal["onebot", "qq_official"] = "onebot"
+    qq_app_id: str = ""
+    qq_app_secret: str = ""
 
     db_host: str = "localhost"
     db_port: int = 3306
@@ -67,10 +70,16 @@ class Settings(BaseSettings):
 
         if self.db_password.strip().lower() in insecure_db_passwords:
             errors.append("DB_PASSWORD must be set to a production secret")
-        if self.onebot_access_token.strip().lower() in insecure_tokens:
-            errors.append("ONEBOT_ACCESS_TOKEN must be set to a production secret")
-        if self.bot_qq.strip().lower() in {"", "change_me"}:
-            errors.append("BOT_QQ must be set in production")
+        if self.bot_platform == "onebot":
+            if self.onebot_access_token.strip().lower() in insecure_tokens:
+                errors.append("ONEBOT_ACCESS_TOKEN must be set to a production secret")
+            if self.bot_qq.strip().lower() in {"", "change_me"}:
+                errors.append("BOT_QQ must be set in production")
+        else:
+            if self.qq_app_id.strip().lower() in {"", "change_me"}:
+                errors.append("QQ_APP_ID must be set in production")
+            if self.qq_app_secret.strip().lower() in insecure_tokens:
+                errors.append("QQ_APP_SECRET must be set to a production secret")
 
         if errors:
             raise ValueError("; ".join(errors))

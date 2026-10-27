@@ -54,6 +54,20 @@ def test_test_environment_accepts_isolated_test_credentials():
     assert settings.db_name == "qqbot_test"
 
 
+def test_official_production_requires_its_own_credentials():
+    settings = production_settings(
+        bot_platform="qq_official",
+        qq_app_id="123456789",
+        qq_app_secret="official-secret",
+        onebot_access_token="",
+        bot_qq="",
+    )
+    assert settings.bot_platform == "qq_official"
+
+    with pytest.raises(ValidationError):
+        production_settings(bot_platform="qq_official", qq_app_id="123456789", qq_app_secret="")
+
+
 def test_local_default_paths_are_not_container_specific(monkeypatch):
     monkeypatch.delenv("IMAGE_FOLDER", raising=False)
     monkeypatch.delenv("LOG_FOLDER", raising=False)
