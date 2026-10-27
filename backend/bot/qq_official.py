@@ -154,6 +154,8 @@ async def handle_message(bot, event, matcher):
     group_id = None
     try:
         if is_group:
+            # 官方 QQ 只提供按群隔离的 member_openid，且当前应用拿不到 union_openid，
+            # 因此同一用户在不同群/私聊会映射到不同内部 ID，签到与冷却按群独立统计。
             group_id = resolve_qq_identity(bot.self_id, "group", event.group_openid)
             user_id = resolve_qq_identity(
                 bot.self_id, "member", event.author.member_openid,
@@ -173,7 +175,13 @@ async def handle_message(bot, event, matcher):
                 lucky_actor_id=selected.id if selected else None,
                 lucky_image_id=image.id if image else None,
             )
-            reply = ("签到成功" if is_new else "你今天已经签到过了") + f"，累计签到{total}天"
+            if is_new:
+                prefix = "签到成功"
+            else:
+                prefix = "你今天已经在本群签到过了" if is_group else "你今天已经签到过了"
+            # 官机群身份按群隔离，累计天数只统计当前群；私聊单独统计。
+            scope = "本群" if is_group else ""
+            reply = f"{prefix}，{scope}累计签到{total}天"
             actor = VoiceActorService.get_voice_actor_by_id(actor_id) if actor_id else None
             if actor:
                 reply += f"\n今天你的妈妈是：{actor.name}"
